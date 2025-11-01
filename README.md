@@ -1,7 +1,18 @@
-<h1>Technetope</h1>
+<h1>Technetope(テクネトープ)</h1>
  <h2>Artist Profile</h2>
  Junpei <B>SAITO</B>, Kosuke <B>Shimizu</B>, Tsubasa <B>SATO</B>
+ <h2>Theme<h2>
+  - 観客は環境の一部である<br>
+  - <br>
+  - <br>
  <h2>Statement</h2>
+
+
+ <h2>Technical ingenuity</h2>
+
+
+
+ <h2>Words of the Ancients</h2>
  <i>L’homme est un roseau pensant(人間は考える葦である)</i> - Blaise Pascal(1623–1662)
  <div class="pt-callout">
     <h5 class="pt-callout-title"><i>~パスカル『パンセ』、由木康訳・岩波文庫より~</i></h5>
