@@ -2,15 +2,24 @@
  <h2>Artist Profile</h2>
  Junpei <B>SAITO</B>, Kosuke <B>Shimizu</B>, Tsubasa <B>SATO</B>
  <h2>Theme<h2>
-  ・観客は環境の一部である<br>
-  ・<br>
-  ・<br>
+  - <i>観客は環境の一部である</i><br>
+  - <i></i><br>
+  - <i></i><br>
  <h2>Statement</h2>
 
 
  <h2>Technical ingenuity</h2>
-
-
+  <h3>1. Toio魔改造</h3>
+  <h3>2. 音響</h3>
+  <h3>3. Toio制御</h3>
+  <h3>4. 動作</h3>
+  <h3>5. 水面グラフィックス</h3>
+  4種類のテーマを設ける<br>
+   ・メダカ×湖畔
+   ・イナゴ×草原
+   ・鴨×秋空
+   ・星×夜空
+   ・NGT×ITF
 
  <h2>Words of the Ancients</h2>
  <i>L’homme est un roseau pensant(人間は考える葦である)</i> - Blaise Pascal(1623–1662)
