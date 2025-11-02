@@ -1,0 +1,10 @@
+{
+  "presets": [
+    {
+      "id": "sample_test",
+      "file": "/presets/sample.wav",
+      "sample_rate": 44100,
+      "gain": 1.0
+    }
+  ]
+}

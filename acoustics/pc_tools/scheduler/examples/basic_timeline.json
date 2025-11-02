@@ -1,0 +1,22 @@
+{
+  "version": "1.0",
+  "default_lead_time": 1.0,
+  "events": [
+    {
+      "offset": 0.0,
+      "address": "/play",
+      "args": ["pad_a", 0.8]
+    },
+    {
+      "offset": 0.5,
+      "address": "/volume",
+      "args": [0.6]
+    },
+    {
+      "offset": 1.25,
+      "address": "/play",
+      "args": ["lead", 0.9]
+    }
+  ]
+}
+

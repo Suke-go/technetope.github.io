@@ -1,0 +1,52 @@
+# General OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.orig
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.mypy_cache/
+.pytest_cache/
+.coverage*
+htmlcov/
+.tox/
+.venv/
+venv/
+.env
+.envrc
+
+# CMake build output
+/build/
+/build-*/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+Testing/
+CTestTestfile.cmake
+Makefile
+install_manifest.txt
+compile_commands.json
+
+# Project-specific build artifacts
+acoustics/build/
+
+# PlatformIO generated files
+.pio/
+.pioenvs/
+.piolibdeps/
+libdeps/
+acoustics/firmware/.pio/
+acoustics/firmware/.pioenvs/
+acoustics/firmware/.piolibdeps/
+
+# Firmware secrets (local only)
+acoustics/firmware/include/Secrets.h
+
+# IDE settings
+.idea/
+.vscode/

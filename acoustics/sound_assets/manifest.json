@@ -1,0 +1,14 @@
+{
+  "version": "0.1.0",
+  "description": "Mapping between preset id and audio assets stored on M5StickC Plus2.",
+  "presets": [
+    {
+      "id": "test_tone",
+      "file": "/presets/sample.wav",
+      "sample_rate": 44100,
+      "gain": 0.7,
+      "length_ms": 500,
+      "notes": "Placeholder entry. Replace with actual asset metadata."
+    }
+  ]
+}
