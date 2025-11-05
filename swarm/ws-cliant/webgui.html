@@ -16,8 +16,9 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            height: 100vh;
+            justify-content: flex-start;
+            min-height: 100vh;
+            padding-bottom: 40px;
         }
         .button {
             width: 100px;
@@ -33,40 +34,92 @@
         .button:active {
             background-color: #0056b3;
         }
-        .joystick {
-            display: grid;
-            grid-template-columns: repeat(3, 100px);
-            grid-gap: 10px;
-            justify-content: center;
-            margin-top: 20px;
+        .joystick-wrapper {
+            margin-top: 25px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
         }
-        .joystick button {
-            width: 100px;
-            height: 100px;
-            font-size: 18px;
+        .joystick-area {
+            width: 180px;
+            height: 180px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #fefefe 0%, #e5e5ef 60%, #d1d1dd 100%);
+            box-shadow: inset 0 2px 6px rgba(0,0,0,0.2);
+            position: relative;
+            touch-action: none;
+            cursor: grab;
+        }
+        .joystick-area:active {
+            cursor: grabbing;
+        }
+        .joystick-handle {
+            width: 70px;
+            height: 70px;
             border-radius: 50%;
             background-color: #28a745;
-            color: white;
-            border: none;
-            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            transition: transform 0.05s linear;
+            pointer-events: none;
         }
-        .joystick button:active {
-            background-color: #1e7e34;
+        .joystick-info {
+            text-align: center;
+            font-family: monospace;
+            color: #333;
         }
         .input-container {
             margin: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            justify-content: center;
         }
         .input-container input {
             padding: 10px;
             font-size: 16px;
             width: 200px;
-            margin-right: 10px;
+        }
+        .input-container label {
+            font-size: 14px;
+            color: #222;
+        }
+        .checkbox-row {
+            justify-content: center;
+            margin-top: -5px;
+        }
+        .checkbox-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 14px;
+        }
+        .checkbox-label input[type="checkbox"] {
+            margin: 0;
+        }
+        .status-panel {
+            margin-top: 20px;
+            padding: 10px 20px;
+            width: 80%;
+            background-color: #fff;
+            border-radius: 5px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            text-align: left;
+        }
+        .status-panel p {
+            margin: 5px 0;
+            font-family: monospace;
         }
         .console {
             margin-top: 20px;
             padding: 10px;
             width: 80%;
-            height: 150px;
+            height: 200px;
             background-color: #333;
             color: #fff;
             overflow-y: auto;
@@ -94,13 +147,27 @@
             <button class="button" id="connect">Connect</button>
             <button class="button" id="disconnect">Disconnect</button>
         </div>
-        <div class="joystick">
-            <button id="up">↑</button>
-            <button id="stop">■</button>
-            <button id="down">↓</button>
-            <button id="left">←</button>
-            <button id="center">○</button>
-            <button id="right">→</button>
+        <div class="input-container checkbox-row">
+            <label class="checkbox-label">
+                <input type="checkbox" id="require-result" checked>
+                <span>Require result response</span>
+            </label>
+        </div>
+        <div class="joystick-wrapper">
+            <div class="joystick-area" id="joystick-area">
+                <div class="joystick-handle" id="joystick-handle"></div>
+            </div>
+            <div class="joystick-info">
+                <p id="joystick-status">Use the stick to drive</p>
+                <p id="motor-status">L: 0 / R: 0</p>
+                <button class="button" id="stop">Stop</button>
+            </div>
+        </div>
+        <div class="input-container">
+            <button class="button" id="battery">Get Battery</button>
+            <button class="button" id="position-once">Get Position Once</button>
+            <button class="button" id="position-subscribe">Subscribe Position</button>
+            <button class="button" id="position-unsubscribe">Stop Position Updates</button>
         </div>
         <div class="slider-container">
             <label for="red-slider">Red:</label>
@@ -111,17 +178,81 @@
             <input type="range" id="blue-slider" class="slider" min="0" max="255" value="0">
             <button class="button" id="set-led">Set LED</button>
         </div>
+        <div class="status-panel">
+            <p id="battery-status">Battery: --%</p>
+            <p id="position-status">Position: (--, --) angle --° on_mat: --</p>
+            <p id="subscription-status">Position updates: not subscribed</p>
+        </div>
         <div class="console" id="console"></div>
     </div>
 
     <script>
         const ws = new WebSocket("ws://localhost:8765/ws");
         const consoleElement = document.getElementById("console");
+        const requireResultCheckbox = document.getElementById("require-result");
+        const batteryStatus = document.getElementById("battery-status");
+        const positionStatus = document.getElementById("position-status");
+        const subscriptionStatus = document.getElementById("subscription-status");
+        let positionSubscribed = false;
 
         function logToConsole(message) {
             const timestamp = new Date().toLocaleTimeString();
             consoleElement.innerHTML += `[${timestamp}] ${message}\n`;
             consoleElement.scrollTop = consoleElement.scrollHeight;
+        }
+
+        function ensureReady() {
+            if (ws.readyState !== WebSocket.OPEN) {
+                logToConsole("WebSocket is not open. Refresh the page to reconnect.");
+                return false;
+            }
+            return true;
+        }
+
+        function getToioId(options = {}) {
+            const { silent = false } = options;
+            const toioId = document.getElementById("toio-id").value.trim();
+            if (!toioId) {
+                if (!silent) {
+                    logToConsole("Please enter a Toio ID.");
+                }
+                return null;
+            }
+            return toioId;
+        }
+
+        function commandPayload(cmd, target, params = {}) {
+            const payload = {
+                type: "command",
+                payload: {
+                    cmd,
+                    target,
+                    params
+                }
+            };
+            if (!requireResultCheckbox.checked) {
+                payload.payload.require_result = false;
+            }
+            return payload;
+        }
+
+        function send(payload) {
+            if (!ensureReady()) return;
+            ws.send(JSON.stringify(payload));
+        }
+
+        function sendQuery(info, target, notify = undefined) {
+            const payload = {
+                type: "query",
+                payload: {
+                    info,
+                    target
+                }
+            };
+            if (notify !== undefined) {
+                payload.payload.notify = notify;
+            }
+            send(payload);
         }
 
         ws.onopen = () => {
@@ -131,10 +262,34 @@
         ws.onmessage = (event) => {
             const message = JSON.parse(event.data);
             logToConsole(`Message from server: ${JSON.stringify(message)}`);
+
+            if (message.type === "response") {
+                const payload = message.payload;
+                if (payload.info === "battery" && typeof payload.battery_level === "number") {
+                    batteryStatus.textContent = `Battery: ${payload.battery_level}%`;
+                }
+                if (payload.info === "position") {
+                    if (payload.position) {
+                        const pos = payload.position;
+                        positionStatus.textContent =
+                            `Position: (${pos.x ?? "--"}, ${pos.y ?? "--"}) angle ${pos.angle ?? "--"}° on_mat: ${pos.on_mat ?? "--"}`;
+                    }
+                    if (typeof payload.notify === "boolean") {
+                        positionSubscribed = payload.notify;
+                        subscriptionStatus.textContent = positionSubscribed
+                            ? "Position updates: subscribed"
+                            : "Position updates: not subscribed";
+                        if (payload.message && !payload.notify) {
+                            logToConsole(`Position subscription ended: ${payload.message}`);
+                        }
+                    }
+                }
+            }
         };
 
         ws.onclose = () => {
             logToConsole("WebSocket connection closed.");
+            subscriptionStatus.textContent = "Position updates: disconnected";
         };
 
         ws.onerror = (error) => {
@@ -142,185 +297,193 @@
         };
 
         document.getElementById("connect").addEventListener("click", () => {
-            const toioId = document.getElementById("toio-id").value;
-            if (!toioId) {
-                logToConsole("Please enter a Toio ID.");
-                return;
-            }
-            const payload = {
-                type: "command",
-                payload: {
-                    cmd: "connect",
-                    target: toioId,
-                    params: {}
-                }
-            };
-            ws.send(JSON.stringify(payload));
-            logToConsole(`Sent connect command for Toio ID: ${toioId}`);
+            const toioId = getToioId();
+            if (!toioId) return;
+            send(commandPayload("connect", toioId));
         });
 
         document.getElementById("disconnect").addEventListener("click", () => {
-            const toioId = document.getElementById("toio-id").value;
-            if (!toioId) {
-                logToConsole("Please enter a Toio ID.");
-                return;
-            }
-            const payload = {
-                type: "command",
-                payload: {
-                    cmd: "disconnect",
-                    target: toioId,
-                    params: {}
-                }
-            };
-            ws.send(JSON.stringify(payload));
-            logToConsole(`Sent disconnect command for Toio ID: ${toioId}`);
+            const toioId = getToioId();
+            if (!toioId) return;
+            send(commandPayload("disconnect", toioId));
         });
 
-        document.getElementById("up").addEventListener("click", () => {
-            const toioId = document.getElementById("toio-id").value;
-            if (!toioId) {
-                logToConsole("Please enter a Toio ID.");
-                return;
+        const joystickArea = document.getElementById("joystick-area");
+        const joystickHandle = document.getElementById("joystick-handle");
+        const joystickStatus = document.getElementById("joystick-status");
+        const motorStatus = document.getElementById("motor-status");
+        const MAX_JOYSTICK_RADIUS = 70; // px
+        const JOYSTICK_INTERVAL_MS = 120;
+        const TURN_SCALE = 0.6;
+        const joystickState = { active: false, x: 0, y: 0 };
+        let joystickInterval = null;
+        let activePointerId = null;
+
+        function clamp(value, min, max) {
+            return Math.max(min, Math.min(max, value));
+        }
+
+        function resetJoystick() {
+            joystickState.x = 0;
+            joystickState.y = 0;
+            joystickHandle.style.transform = "translate(-50%, -50%)";
+            joystickStatus.textContent = "Use the stick to drive";
+            motorStatus.textContent = "L: 0 / R: 0";
+        }
+
+        function updateJoystickFromEvent(event) {
+            const rect = joystickArea.getBoundingClientRect();
+            const x = event.clientX - (rect.left + rect.width / 2);
+            const y = event.clientY - (rect.top + rect.height / 2);
+            const distance = Math.hypot(x, y);
+            const limitedDistance = Math.min(distance, MAX_JOYSTICK_RADIUS);
+            const angle = Math.atan2(y, x);
+            const limitedX = limitedDistance * Math.cos(angle);
+            const limitedY = limitedDistance * Math.sin(angle);
+
+            joystickState.x = limitedX / MAX_JOYSTICK_RADIUS;
+            joystickState.y = limitedY / MAX_JOYSTICK_RADIUS;
+
+            joystickHandle.style.transform = `translate(calc(-50% + ${limitedX}px), calc(-50% + ${limitedY}px))`;
+            joystickStatus.textContent = `Stick: x=${joystickState.x.toFixed(2)}, y=${(-joystickState.y).toFixed(2)}`;
+        }
+
+        function startJoystickLoop() {
+            if (joystickInterval) return;
+            joystickInterval = setInterval(() => {
+                if (!joystickState.active) return;
+                const toioId = getToioId({ silent: true });
+                if (!toioId) return;
+                const forward = -joystickState.y;
+                const turn = joystickState.x;
+                const maxSpeed = 100;
+                const linear = forward * maxSpeed;
+                const angular = turn * maxSpeed * TURN_SCALE;
+                const left = clamp(Math.round(linear + angular), -100, 100);
+                const right = clamp(Math.round(linear - angular), -100, 100);
+                motorStatus.textContent = `L: ${left} / R: ${right}`;
+                send(commandPayload("move", toioId, { left_speed: left, right_speed: right }));
+            }, JOYSTICK_INTERVAL_MS);
+        }
+
+        function stopJoystickLoop(sendStop = true) {
+            if (joystickInterval) {
+                clearInterval(joystickInterval);
+                joystickInterval = null;
             }
-            const payload = {
-                type: "command",
-                payload: {
-                    cmd: "move",
-                    target: toioId,
-                    params: {
-                        left_speed: 50,
-                        right_speed: 50
-                    }
-                }
-            };
-            ws.send(JSON.stringify(payload));
-            logToConsole(`Sent move up command for Toio ID: ${toioId}`);
+            joystickState.active = false;
+            activePointerId = null;
+            resetJoystick();
+            if (sendStop) {
+                sendStopCommand();
+            }
+        }
+
+        function sendStopCommand(options = {}) {
+            const { silent = true, log = false } = options;
+            const toioId = getToioId({ silent });
+            if (!toioId) return;
+            send(commandPayload("move", toioId, { left_speed: 0, right_speed: 0 }));
+            motorStatus.textContent = "L: 0 / R: 0";
+            if (log) {
+                logToConsole(`Sent stop command for Toio ID: ${toioId}`);
+            }
+        }
+
+        joystickArea.addEventListener("pointerdown", (event) => {
+            event.preventDefault();
+            joystickArea.setPointerCapture(event.pointerId);
+            activePointerId = event.pointerId;
+            joystickState.active = true;
+            updateJoystickFromEvent(event);
+            startJoystickLoop();
         });
 
-        document.getElementById("down").addEventListener("click", () => {
-            const toioId = document.getElementById("toio-id").value;
-            if (!toioId) {
-                logToConsole("Please enter a Toio ID.");
-                return;
-            }
-            const payload = {
-                type: "command",
-                payload: {
-                    cmd: "move",
-                    target: toioId,
-                    params: {
-                        left_speed: -50,
-                        right_speed: -50
-                    }
-                }
-            };
-            ws.send(JSON.stringify(payload));
-            logToConsole(`Sent move down command for Toio ID: ${toioId}`);
+        joystickArea.addEventListener("pointermove", (event) => {
+            if (!joystickState.active || event.pointerId !== activePointerId) return;
+            event.preventDefault();
+            updateJoystickFromEvent(event);
         });
 
-        document.getElementById("left").addEventListener("click", () => {
-            const toioId = document.getElementById("toio-id").value;
-            if (!toioId) {
-                logToConsole("Please enter a Toio ID.");
-                return;
-            }
-            const payload = {
-                type: "command",
-                payload: {
-                    cmd: "move",
-                    target: toioId,
-                    params: {
-                        left_speed: -30,
-                        right_speed: 30
-                    }
+        ["pointerup", "pointercancel", "pointerleave"].forEach((type) => {
+            joystickArea.addEventListener(type, (event) => {
+                if (!joystickState.active || event.pointerId !== activePointerId) return;
+                event.preventDefault();
+                try {
+                    joystickArea.releasePointerCapture(event.pointerId);
+                } catch (err) {
+                    // ignore if capture already released
                 }
-            };
-            ws.send(JSON.stringify(payload));
-            logToConsole(`Sent move left command for Toio ID: ${toioId}`);
-        });
-
-        document.getElementById("right").addEventListener("click", () => {
-            const toioId = document.getElementById("toio-id").value;
-            if (!toioId) {
-                logToConsole("Please enter a Toio ID.");
-                return;
-            }
-            const payload = {
-                type: "command",
-                payload: {
-                    cmd: "move",
-                    target: toioId,
-                    params: {
-                        left_speed: 30,
-                        right_speed: -30
-                    }
-                }
-            };
-            ws.send(JSON.stringify(payload));
-            logToConsole(`Sent move right command for Toio ID: ${toioId}`);
+                stopJoystickLoop(true);
+            });
         });
 
         document.getElementById("stop").addEventListener("click", () => {
-            const toioId = document.getElementById("toio-id").value;
-            if (!toioId) {
-                logToConsole("Please enter a Toio ID.");
-                return;
-            }
-            const payload = {
-                type: "command",
-                payload: {
-                    cmd: "move",
-                    target: toioId,
-                    params: {
-                        left_speed: 0,
-                        right_speed: 0
-                    }
-                }
-            };
-            ws.send(JSON.stringify(payload));
-            logToConsole(`Sent stop command for Toio ID: ${toioId}`);
+            stopJoystickLoop(false);
+            sendStopCommand({ silent: false, log: true });
+        });
+
+        document.getElementById("battery").addEventListener("click", () => {
+            const toioId = getToioId();
+            if (!toioId) return;
+            sendQuery("battery", toioId);
+        });
+
+        document.getElementById("position-once").addEventListener("click", () => {
+            const toioId = getToioId();
+            if (!toioId) return;
+            sendQuery("position", toioId, false);
+        });
+
+        document.getElementById("position-subscribe").addEventListener("click", () => {
+            const toioId = getToioId();
+            if (!toioId) return;
+            sendQuery("position", toioId, true);
+        });
+
+        document.getElementById("position-unsubscribe").addEventListener("click", () => {
+            const toioId = getToioId();
+            if (!toioId) return;
+            sendQuery("position", toioId, false);
         });
 
         let ledUpdateInterval;
         const startLedUpdate = () => {
-            if (ledUpdateInterval) return; // Prevent multiple intervals
-
+            if (ledUpdateInterval) return;
             ledUpdateInterval = setInterval(() => {
-                const toioId = document.getElementById("toio-id").value;
+                const toioId = getToioId({ silent: true });
                 if (!toioId) {
-                    logToConsole("Please enter a Toio ID.");
+                    stopLedUpdate();
                     return;
                 }
-                const red = document.getElementById("red-slider").value;
-                const green = document.getElementById("green-slider").value;
-                const blue = document.getElementById("blue-slider").value;
-                const payload = {
-                    type: "command",
-                    payload: {
-                        cmd: "led",
-                        target: toioId,
-                        params: {
-                            r: parseInt(red),
-                            g: parseInt(green),
-                            b: parseInt(blue)
-                        }
-                    }
-                };
-                ws.send(JSON.stringify(payload));
-                logToConsole(`Sent LED command for Toio ID: ${toioId} with color RGB(${red}, ${green}, ${blue})`);
-            }, 100); // 20Hz = 50ms interval
+                const red = parseInt(document.getElementById("red-slider").value, 10);
+                const green = parseInt(document.getElementById("green-slider").value, 10);
+                const blue = parseInt(document.getElementById("blue-slider").value, 10);
+                send(commandPayload("led", toioId, { r: red, g: green, b: blue }));
+            }, 100);
         };
 
         const stopLedUpdate = () => {
-            clearInterval(ledUpdateInterval);
-            ledUpdateInterval = null;
+            if (ledUpdateInterval) {
+                clearInterval(ledUpdateInterval);
+                ledUpdateInterval = null;
+            }
         };
 
         document.querySelectorAll(".slider").forEach(slider => {
             slider.addEventListener("mousedown", startLedUpdate);
+            slider.addEventListener("touchstart", startLedUpdate);
             slider.addEventListener("mouseup", stopLedUpdate);
+            slider.addEventListener("touchend", stopLedUpdate);
             slider.addEventListener("mouseleave", stopLedUpdate);
+        });
+        document.getElementById("set-led").addEventListener("click", () => {
+            const toioId = getToioId();
+            if (!toioId) return;
+            const red = parseInt(document.getElementById("red-slider").value, 10);
+            const green = parseInt(document.getElementById("green-slider").value, 10);
+            const blue = parseInt(document.getElementById("blue-slider").value, 10);
+            send(commandPayload("led", toioId, { r: red, g: green, b: blue }));
         });
     </script>
 </body>
