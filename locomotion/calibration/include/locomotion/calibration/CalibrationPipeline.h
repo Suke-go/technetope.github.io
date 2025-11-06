@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "locomotion/calibration/CharucoDetector.h"
+#include "locomotion/calibration/FloorPlaneEstimator.h"
 #include "locomotion/calibration/PlaymatLayout.h"
 
 #include <librealsense2/rs.hpp>
@@ -96,6 +97,7 @@ class CalibrationPipeline {
   cv::Ptr<cv::aruco::CharucoBoard> board_;
   CharucoDetectorConfig charuco_config_;
   std::unique_ptr<CharucoDetector> charuco_detector_;
+  std::unique_ptr<FloorPlaneEstimator> floor_estimator_;
 
   PlaymatLayout playmat_layout_;
   bool has_playmat_layout_{false};

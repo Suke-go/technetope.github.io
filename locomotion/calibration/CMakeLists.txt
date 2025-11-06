@@ -14,6 +14,7 @@ add_library(locomotion_calibration STATIC
     src/CharucoDetector.cpp
     src/CalibrationSession.cpp
     src/PlaymatLayout.cpp
+    src/FloorPlaneEstimator.cpp
 )
 
 target_include_directories(locomotion_calibration

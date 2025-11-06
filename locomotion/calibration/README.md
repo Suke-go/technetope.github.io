@@ -36,6 +36,28 @@ cmake --build build
 
 ルートプロジェクトへ統合する場合は、上記 CMakeLists を親プロジェクトから `add_subdirectory(locomotion/calibration)` してください。
 
+## ディレクトリ構成（主要ファイル）
+
+```
+locomotion/calibration/
+ ├─ CMakeLists.txt
+ ├─ include/locomotion/calibration/
+ │   ├─ CalibrationPipeline.h        # RealSense 取得＋処理パイプライン
+ │   ├─ CalibrationSession.h         # リトライ制御／結果集計
+ │   ├─ CalibrationResult.h
+ │   ├─ CharucoDetector.h            # Charuco 検出ラッパ
+ │   ├─ FloorPlaneEstimator.h        # 床面フィット（RANSAC 実装予定）
+ │   └─ PlaymatLayout.h              # プレイマットレイアウト読み込み
+ ├─ src/
+ │   ├─ CalibrationPipeline.cpp
+ │   ├─ CalibrationSession.cpp
+ │   ├─ CharucoDetector.cpp
+ │   ├─ FloorPlaneEstimator.cpp      # いまはプレースホルダ、将来 RANSAC 実装
+ │   └─ PlaymatLayout.cpp
+ ├─ config/                          # toio プレイマットレイアウト JSON
+ └─ tools/                           # キャリブレーション CLI / スクリプト
+```
+
 ## toio プレイマットと Charuco レイアウトの用意手順
 
 1. **プレイマット実測**  

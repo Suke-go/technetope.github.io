@@ -62,7 +62,11 @@ CalibrationPipeline::CalibrationPipeline(CalibrationConfig config)
     : config_(std::move(config)) {}
 
 CalibrationPipeline::~CalibrationPipeline() {
-  pipeline_.stop();
+  try {
+    pipeline_.stop();
+  } catch (const rs2::error& err) {
+    spdlog::warn("RealSense pipeline stop failed: {}", err.what());
+  }
 }
 
 bool CalibrationPipeline::initialize() {
@@ -81,6 +85,15 @@ bool CalibrationPipeline::initialize() {
   charuco_config_.subpixel_epsilon = config_.charuco_subpixel_epsilon;
   charuco_detector_ =
       std::make_unique<CharucoDetector>(dictionary_, board_, charuco_config_);
+
+  if (config_.enable_floor_plane_fit) {
+    FloorPlaneEstimatorConfig floor_config;
+    floor_config.inlier_threshold_mm = config_.floor_inlier_threshold_mm;
+    floor_config.ransac_iterations = config_.floor_ransac_iterations;
+    floor_estimator_ = std::make_unique<FloorPlaneEstimator>(floor_config);
+  } else {
+    floor_estimator_.reset();
+  }
 
   try {
     playmat_layout_ = PlaymatLayout::LoadFromFile(config_.playmat_layout_path);
@@ -193,14 +206,24 @@ bool CalibrationPipeline::computeHomography(
   return reprojection_error <= config_.max_reprojection_error_id;
 }
 
-bool CalibrationPipeline::estimateFloorPlane(const FrameBundle&,
+bool CalibrationPipeline::estimateFloorPlane(const FrameBundle& bundle,
                                              cv::Vec4f& plane,
                                              double& plane_std_mm,
                                              double& inlier_ratio) {
-  // TODO: 実際の RANSAC 平面当てはめを実装
-  plane = {0.0F, 0.0F, 1.0F, 0.0F};
-  plane_std_mm = 0.0;
-  inlier_ratio = 0.0;
+  if (!floor_estimator_) {
+    spdlog::warn("FloorPlaneEstimator is not initialized.");
+    return false;
+  }
+
+  auto estimate = floor_estimator_->Estimate(bundle.depth);
+  if (!estimate) {
+    spdlog::warn("Floor plane estimation returned no result.");
+    return false;
+  }
+
+  plane = estimate->plane;
+  plane_std_mm = estimate->plane_std_mm;
+  inlier_ratio = estimate->inlier_ratio;
   return true;
 }
 
