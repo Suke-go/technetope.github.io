@@ -1,6 +1,30 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bitcount+Grid+Single+Ink:wght@100..900&display=swap" rel="stylesheet">
+
+<style>
+.bitcount-grid-single-ink {
+  font-family: "Bitcount Grid Single Ink", system-ui, sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 300; /* Light */
+  font-style: normal;
+  font-variation-settings:
+    "slnt" 0,
+    "CRSV" 0.5,
+    "ELSH" 0,
+    "ELXP" 0,
+    "SZP1" 0,
+    "SZP2" 0,
+    "XPN1" 0,
+    "XPN2" 0,
+    "YPN1" 0,
+    "YPN2" 0;
+}
+</style>
+    
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Technetope</title>
@@ -58,7 +82,7 @@
         }
         
         .subtitle {
-            font-size: 0.9em;
+            font-size: 1.1em;
             letter-spacing: 0.3em;
             color: #888;
             opacity: 0;
@@ -89,9 +113,9 @@
             position: absolute;
             top: 20px;
             right: 40px;
-            color: #888;
+            color: #eeeeee;
             text-decoration: none;
-            font-size: 0.85em;
+            font-size: 1.1em;
             letter-spacing: 0.1em;
             transition: color 0.3s;
             display: flex;
@@ -119,7 +143,7 @@
         section:nth-child(3) { animation-delay: 2s; }
         
         h2 {
-            font-size: 1.2em;
+            font-size: 1.5em;
             font-weight: 400;
             letter-spacing: 0.15em;
             margin-bottom: 40px;
@@ -162,7 +186,7 @@
         }
         
         .words-title {
-            font-size: 0.85em;
+            font-size: 1.1em;
             letter-spacing: 0.2em;
             color: #666;
             margin-bottom: 40px;
@@ -211,6 +235,46 @@
                 transform: translateY(0);
             }
         }
+
+
+        
+        /* 点滅 */
+.blinking1{
+	-webkit-animation:blink 0.8s ease-in-out infinite alternate;
+    -moz-animation:blink 0.8s ease-in-out infinite alternate;
+    animation:blink 0.8s ease-in-out infinite alternate;
+}
+@-webkit-keyframes blink{
+    0% {opacity:0;}
+    100% {opacity:1;}
+}
+@-moz-keyframes blink{
+    0% {opacity:0;}
+    100% {opacity:1;}
+}
+@keyframes blink{
+    0% {opacity:0;}
+    100% {opacity:1;}
+}
+
+		.blinking2{
+	-webkit-animation:blink 0.85s ease-in-out infinite alternate;
+    -moz-animation:blink 0.85s ease-in-out infinite alternate;
+    animation:blink 0.85s ease-in-out infinite alternate;
+}
+@-webkit-keyframes blink{
+    0% {opacity:0;}
+    100% {opacity:1;}
+}
+@-moz-keyframes blink{
+    0% {opacity:0;}
+    100% {opacity:1;}
+}
+@keyframes blink{
+    0% {opacity:0;}
+    100% {opacity:1;}
+}
+
         
         /* 背景の動くドット */
         .background-dots {
@@ -277,7 +341,7 @@
                 top: 15px;
                 flex-direction: column;
                 gap: 10px;
-                font-size: 0.8em;
+                font-size: 1.0em;
             }
             
             .nav-link a {
@@ -297,7 +361,7 @@
             }
             
             h2 {
-                font-size: 1.1em;
+                font-size: 1.3em;
                 margin-bottom: 30px;
             }
             
@@ -418,10 +482,14 @@
     
     <div class="container">
         <div class="nav-link">
-            <a href="technical.html">Technical Ingenuity →</a>
-            <a href="artists.html">Artists →</a>
+            <a href="technical.html"><p class="bitcount-grid-single-ink">
+            <span class="blinking1">Technical Ingenuity →</span>
+            </p></a>
+            <a href="artists.html"><p class="bitcount-grid-single-ink">
+            <span class="blinking2">Artists →</span>
+            </p></a>
         </div>
-        
+
         <header>
             <h1>Technetope</h1>
             <div class="subtitle">テクネトープ</div>
@@ -432,7 +500,10 @@
         </header>
         
         <section class="statement">
-            <h2>Statement</h2>
+            <h2>
+            <p class="bitcount-grid-single-ink">
+            Statement
+            </p></h2>
             
             <p>テクノロジーによって構築された新しい"生態系"</p>
             
@@ -443,12 +514,12 @@
             <p>小さな生物にとって、人は流れてきた障害物であり、木の葉や浮き草、葦や大木のように回避すべき対象である。スピーカー群はその存在を本能のように察知し、分かれ、避け、再び群れを成す。この振る舞いが秩序となった生態系内で人間は唯一、本能ではなく意志を持ってシステムに参与してくる事象である。</p>
             
             <p>「Technetope」は、テクノロジーで生み出した生物が本能的に振る舞う非生命体群を形成して、を通じて、"テクノロジーによって生み出された生態系システムに人間が反秩序的に介入してくるが、その絶えず変化する作用に生態系の秩序が順応する瞬間"を描き出す試みである。それは自然と人工の二項対立を越え、人間・機械・環境が相互に生成し合う新たな生命観の原型を提示する。</p>
-            
-            <p></p>
         </section>
         
         <section class="words">
-            <div class="words-title">Words of the Ancients</div>
+            <div class="words-title"><p class="bitcount-grid-single-ink">
+            Words of the Ancients
+            </p></div>
             
             <div class="quote-main">
                 <em>L'homme est un roseau pensant</em><br>
@@ -462,12 +533,33 @@
             </div>
         </section>
     </div>
-    
+
+    <style>
+        header h1 {
+            font-family: 'Bitcount Grid Single Ink', monospace;
+            font-size: 4rem;
+            letter-spacing: 0.1em;
+            color: #fff;
+            margin: 0;
+            display: inline-block;
+        }
+
+        header h1 span {
+            display: inline-block;
+            transition: all 0.6s ease;
+            font-family: 'Bitcount Grid Single Ink', monospace;
+            color: #fff;
+        }
+
+        header h1 span.serif {
+            font-family: "游明朝体", "Yu Mincho", "Hiragino Mincho ProN", serif;
+            transform: scale(1.05);
+        }
+    </style>
+
     <script>
-        // 背景にランダムに動くドットを生成
         const dotsContainer = document.getElementById('dots');
         const dotCount = 30;
-        
         for (let i = 0; i < dotCount; i++) {
             const dot = document.createElement('div');
             dot.className = 'dot';
@@ -477,20 +569,31 @@
             dot.style.animationDuration = (15 + Math.random() * 10) + 's';
             dotsContainer.appendChild(dot);
         }
-    </script>
-    
-    <script>
-        // 背景画像の読み込みを待つ
+
         const bgImage = new Image();
         bgImage.src = 'https://raw.githubusercontent.com/Rhizobium-gits/Technetope/main/figure/background_claud3.png';
-        
-        bgImage.onload = function() {
-            document.body.classList.add('loaded');
-        };
-        
-        bgImage.onerror = function() {
-            document.body.classList.add('loaded');
-        };
+        bgImage.onload = () => document.body.classList.add('loaded');
+        bgImage.onerror = () => document.body.classList.add('loaded');
+
+        const h1 = document.querySelector("header h1");
+        const text = h1.textContent.trim();
+        h1.textContent = "";
+
+        const spans = text.split("").map(ch => {
+            const span = document.createElement("span");
+            span.textContent = ch;
+            h1.appendChild(span);
+            return span;
+        });
+
+        setTimeout(() => {
+            const order = spans.map((_, i) => i).sort(() => Math.random() - 0.5);
+            order.forEach((i, index) => {
+                setTimeout(() => {
+                    spans[i].classList.add("serif");
+                }, index * 250 + Math.random() * 300);
+            });
+        }, 1700);
     </script>
 </body>
 </html>
