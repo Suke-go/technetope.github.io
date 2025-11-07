@@ -54,7 +54,7 @@ source ~/.zshrc   # zsh の場合
 # コード
 ### technetope リポジトリ クローンと toio ブランチへ切り替え
 ```bash
-git clone https://github.com/Suke-go/technetope.git
+git clone https://github.com/Technetope/technetope.git
 cd technetope
 git switch -c toio origin/toio 
 ```
