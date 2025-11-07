@@ -3,6 +3,7 @@
 ### ネットワーク
 ```bash
 sudo nmcli device wifi connect "SSID名" password "パスワード"
+sudo nmcli device wifi connect "JCOM_OIHI" password "530741765746"
 ```
 
 ### 基本更新
@@ -33,6 +34,10 @@ bluetoothctl show
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | bash
 ```
+### 今のシェルの確認
+```bash
+echo $SHELL
+```
 
 ### パス通す（~/.bashrc or ~/.zshrc に追記）
 ```bash
@@ -40,10 +45,6 @@ echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc  # bash の場合
 echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc  # zsh の場合
 ```
 
-### 今のシェルの確認
-```bash
-echo $SHELL
-```
 ### 反映
 ```bash
 source ~/.bashrc  # bash の場合
