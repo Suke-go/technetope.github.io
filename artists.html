@@ -5,22 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Artists - Technetope</title>
     <link rel="preload" as="image" href="https://raw.githubusercontent.com/Rhizobium-gits/Technetope/main/figure/background_cloud4.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bitcount+Grid+Single+Ink:wght@100..900&display=swap" rel="stylesheet">
     <style>
         body {
             opacity: 0;
             transition: opacity 0.8s ease-in;
         }
-        
-        body.loaded {
-            opacity: 1;
-        }
-        
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
+        body.loaded { opacity: 1; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Hiragino Mincho ProN', 'ヒラギノ明朝 ProN', 'Yu Mincho', '游明朝', 'Times New Roman', serif;
             background-color: #ffffff;
@@ -36,405 +30,100 @@
             margin: 0;
             position: relative;
         }
-        
         .ripple-container {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            width: 0;
-            height: 0;
-            pointer-events: none;
-            z-index: 5;
+            position: fixed; top: 50%; left: 50%;
+            width: 0; height: 0; pointer-events: none; z-index: 5;
         }
-        
         .ripple {
-            position: absolute;
-            border: 0.01px solid #000000;
-            border-radius: 50%;
-            opacity: 0;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
+            position: absolute; border: 0.01px solid #000000;
+            border-radius: 50%; opacity: 0;
+            top: 50%; left: 50%; transform: translate(-50%, -50%);
         }
-        
-        .ripple1 {
-            width: 100px;
-            height: 100px;
-            animation: rippleEffect 2s ease-out;
-        }
-        
-        .ripple2 {
-            width: 100px;
-            height: 100px;
-            animation: rippleEffect 2s ease-out 0.2s;
-        }
-        
-        .ripple3 {
-            width: 100px;
-            height: 100px;
-            animation: rippleEffect 2s ease-out 0.4s;
-        }
-        
-        .ripple4 {
-            width: 100px;
-            height: 100px;
-            animation: rippleEffect 2s ease-out 0.6s;
-        }
-        
-        .ripple5 {
-            width: 100px;
-            height: 100px;
-            animation: rippleEffect 2s ease-out 0.8s;
-        }
-        
+        .ripple1 { width: 100px; height: 100px; animation: rippleEffect 2s ease-out; }
+        .ripple2 { width: 100px; height: 100px; animation: rippleEffect 2s ease-out 0.2s; }
+        .ripple3 { width: 100px; height: 100px; animation: rippleEffect 2s ease-out 0.4s; }
+        .ripple4 { width: 100px; height: 100px; animation: rippleEffect 2s ease-out 0.6s; }
+        .ripple5 { width: 100px; height: 100px; animation: rippleEffect 2s ease-out 0.8s; }
+
         @keyframes rippleEffect {
-            0% {
-                transform: translate(-50%, -50%) scale(0.1);
-                opacity: 0;
-            }
-            30% {
-                opacity: 1;
-            }
-            100% {
-                transform: translate(-50%, -50%) scale(15);
-                opacity: 0;
-            }
+            0% { transform: translate(-50%, -50%) scale(0.1); opacity: 0; }
+            30% { opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(15); opacity: 0; }
         }
-        
+
         body::before {
-            content: '';
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.6);
-            pointer-events: none;
-            opacity: 0;
-            animation: overlayFadeIn 0.8s ease-in 1.5s forwards;
-            z-index: 10;
+            content: ''; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.6); pointer-events: none; opacity: 0;
+            animation: overlayFadeIn 0.8s ease-in 1.5s forwards; z-index: 10;
         }
-        
-        body > * {
-            position: relative;
-            z-index: 100;
-        }
-        
-        @keyframes overlayFadeIn {
-            from {
-                opacity: 0;
-            }
-            to {
-                opacity: 1;
-            }
-        }
-        
+        body > * { position: relative; z-index: 100; }
+        @keyframes overlayFadeIn { from { opacity: 0; } to { opacity: 1; } }
         body::after {
-            content: '';
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(255, 255, 255, 0.15);
-            pointer-events: none;
-            z-index: 1;
-            opacity: 0;
-            animation: fadeInOverlay 0.8s ease-in 1.5s forwards;
+            content: ''; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 255, 255, 0.15); pointer-events: none;
+            z-index: 1; opacity: 0; animation: fadeInOverlay 0.8s ease-in 1.5s forwards;
         }
-        
-        @keyframes fadeInOverlay {
-            to {
-                opacity: 1;
-            }
-        }
-        
-        .logo, h1, .artist, .artist-image, .artist-content {
-            position: relative;
-            z-index: 10;
-        }
-        
-        .logo {
-            position: fixed;
-            top: 30px;
-            left: 30px;
-            z-index: 100;
-        }
-        
+        @keyframes fadeInOverlay { to { opacity: 1; } }
+
+        .logo, h1, .artist, .artist-image, .artist-content { position: relative; z-index: 10; }
+        .logo { position: fixed; top: 30px; left: 30px; z-index: 100; }
         .logo a {
             font-family: 'Hiragino Mincho ProN', 'ヒラギノ明朝 ProN', 'Yu Mincho', '游明朝', 'Times New Roman', serif;
-            font-size: 1.5em;
-            color: #000000;
-            text-decoration: none;
-            letter-spacing: 0.1em;
-            font-weight: 300;
-            transition: opacity 0.3s;
+            font-size: 1.5em; color: #000000; text-decoration: none;
+            letter-spacing: 0.1em; font-weight: 300; transition: opacity 0.3s;
         }
-        
-        .logo a:hover {
-            opacity: 0.6;
-        }
-        
+        .logo a:hover { opacity: 0.6; }
+
         h1 {
-            font-size: 2em;
-            margin-bottom: 80px;
-            margin-top: 60px;
-            font-weight: 300;
-            letter-spacing: 0.05em;
+            font-size: 2em; margin-bottom: 80px; margin-top: 60px;
+            font-weight: 300; letter-spacing: 0.05em;
             background: linear-gradient(to right, rgba(0, 0, 0, 0.6) 50%, transparent 50%);
-            background-size: 200% 100%;
-            background-position: 100% 0;
-            padding: 8px 15px;
-            display: inline-block;
+            background-size: 200% 100%; background-position: 100% 0;
+            padding: 8px 15px; display: inline-block;
             animation: typewriterMarker 0.8s ease-out 2s forwards;
+            font-family: 'Bitcount Grid Single Ink', monospace; color: #fff;
         }
-        
+        h1 span {
+            display: inline-block; transition: all 0.6s ease;
+            font-family: 'Bitcount Grid Single Ink', monospace;
+        }
+        h1 span.serif {
+            font-family: "游明朝体", "Yu Mincho", "Hiragino Mincho ProN", serif;
+            transform: scale(1.05);
+        }
+
         @keyframes typewriterMarker {
-            from {
-                background-position: 100% 0;
-            }
-            to {
-                background-position: 0% 0;
-            }
+            from { background-position: 100% 0; }
+            to { background-position: 0% 0; }
         }
-        
-        .artist {
-            margin-bottom: 120px;
-            display: flex;
-            gap: 40px;
-            align-items: flex-start;
-        }
-        
-        .artist-image {
-            flex-shrink: 0;
-            width: 200px;
-            height: 200px;
-            background: rgba(245, 245, 245, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #cccccc;
-            font-size: 0.85em;
-        }
-        
-        .artist-image img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-        
-        .artist-content {
-            flex: 1;
-        }
-        
-        h2 {
-            font-size: 1.5em;
-            margin-bottom: 25px;
-            font-weight: 400;
-            letter-spacing: 0.03em;
-            background: linear-gradient(to right, rgba(0, 0, 0, 0.6) 50%, transparent 50%);
-            background-size: 200% 100%;
-            background-position: 100% 0;
-            padding: 8px 15px;
-            display: inline-block;
-            animation: typewriterMarker 0.6s ease-out 2.2s forwards;
-        }
-        
-        .bio {
-            margin-bottom: 30px;
-            font-size: 0.95em;
-            line-height: 2;
-            text-align: justify;
-            background: linear-gradient(to right, rgba(0, 0, 0, 0.6) 50%, transparent 50%);
-            background-size: 200% 100%;
-            background-position: 100% 0;
-            padding: 10px 15px;
-            animation: typewriterMarker 0.8s ease-out 2.4s forwards;
-        }
-        
-        .section-title {
-            font-size: 1em;
-            font-weight: 500;
-            margin-top: 30px;
-            margin-bottom: 15px;
-            letter-spacing: 0.05em;
-            background: linear-gradient(to right, rgba(0, 0, 0, 0.6) 50%, transparent 50%);
-            background-size: 200% 100%;
-            background-position: 100% 0;
-            padding: 8px 15px;
-            display: inline-block;
-            animation: typewriterMarker 0.6s ease-out 2.6s forwards;
-        }
-        
-        .timeline {
-            font-size: 0.9em;
-            line-height: 1.9;
-            color: #ffffff;
-            background: linear-gradient(to right, rgba(0, 0, 0, 0.6) 50%, transparent 50%);
-            background-size: 200% 100%;
-            background-position: 100% 0;
-            padding: 10px 15px;
-            animation: typewriterMarker 0.8s ease-out 2.8s forwards;
-        }
-        
-        .timeline-item {
-            display: flex;
-            margin-bottom: 8px;
-        }
-        
-        .year {
-            min-width: 60px;
-            color: #e0e0e0;
-        }
-        
-        .description {
-            flex: 1;
-        }
-        
-        /* スマホ用の最適化 (768px以下) */
-        @media (max-width: 768px) {
-            body {
-                /* スマホでは縦長の背景を最適化 */
-                background-size: auto 100%;
-                background-position: center center;
-                background-attachment: scroll; /* スマホではスクロールに追従 */
-                padding: 20px 15px;
-                max-width: 100%;
-            }
-            
-            .logo {
-                top: 15px;
-                left: 15px;
-            }
-            
-            .logo a {
-                font-size: 1.1em;
-                /* タッチ操作しやすいように */
-                padding: 5px;
-                display: inline-block;
-            }
-            
-            h1 {
-                font-size: 1.5em;
-                margin-bottom: 50px;
-                margin-top: 50px;
-                padding: 6px 12px;
-            }
-            
-            .artist {
-                flex-direction: column;
-                margin-bottom: 80px;
-                gap: 25px;
-            }
-            
-            .artist-image {
-                width: 100%;
-                max-width: 250px;
-                height: 250px;
-                margin: 0 auto;
-            }
-            
-            h2 {
-                font-size: 1.3em;
-                margin-bottom: 20px;
-                padding: 6px 12px;
-            }
-            
-            .bio {
-                font-size: 0.9em;
-                line-height: 1.95;
-                padding: 8px 12px;
-            }
-            
-            .section-title {
-                font-size: 0.95em;
-                margin-top: 25px;
-                padding: 6px 12px;
-            }
-            
-            .timeline {
-                font-size: 0.85em;
-                padding: 8px 12px;
-            }
-            
-            .year {
-                min-width: 55px;
-                font-size: 0.95em;
-            }
-        }
-        
-        /* タブレット用の最適化 (769px〜1024px) */
-        @media (min-width: 769px) and (max-width: 1024px) {
-            body {
-                background-size: cover;
-                background-position: center center;
-                padding: 35px 25px 35px 70px;
-            }
-            
-            .logo {
-                top: 25px;
-                left: 25px;
-            }
-            
-            .logo a {
-                font-size: 1.35em;
-            }
-            
-            h1 {
-                font-size: 1.8em;
-                margin-bottom: 70px;
-            }
-            
-            .artist {
-                margin-bottom: 100px;
-                gap: 35px;
-            }
-            
-            .artist-image {
-                width: 180px;
-                height: 180px;
-            }
-        }
-        
-        /* PC大画面用の最適化 (1025px以上) */
-        @media (min-width: 1025px) {
-            body {
-                background-size: cover;
-                background-position: center center;
-            }
-            
-            /* より大きな画面では余白を増やす */
-            @media (min-width: 1400px) {
-                body {
-                    max-width: 1200px;
-                    margin: 0 auto;
-                }
-            }
-        }
-        
-        /* 横向きスマホ用 */
-        @media (max-width: 768px) and (orientation: landscape) {
-            body {
-                background-size: cover;
-                background-position: center center;
-            }
-            
-            h1 {
-                margin-top: 30px;
-                margin-bottom: 40px;
-            }
-            
-            .artist {
-                flex-direction: row;
-                margin-bottom: 60px;
-            }
-            
-            .artist-image {
-                width: 150px;
-                height: 150px;
-            }
-        }
+
+        .artist { margin-bottom: 120px; display: flex; gap: 40px; align-items: flex-start; }
+        .artist-image { flex-shrink: 0; width: 200px; height: 200px;
+            background: rgba(245,245,245,0.1);
+            border: 1px solid rgba(255,255,255,0.3);
+            display: flex; align-items: center; justify-content: center;
+            color: #ccc; font-size: 0.85em; }
+        .artist-image img { width: 100%; height: 100%; object-fit: cover; }
+        .artist-content { flex: 1; }
+        h2 { font-size: 1.5em; margin-bottom: 25px; font-weight: 400; letter-spacing: 0.03em;
+            background: linear-gradient(to right, rgba(0,0,0,0.6) 50%, transparent 50%);
+            background-size: 200% 100%; background-position: 100% 0;
+            padding: 8px 15px; display: inline-block; animation: typewriterMarker 0.6s ease-out 2.2s forwards; }
+        .bio { margin-bottom: 30px; font-size: 0.95em; line-height: 2; text-align: justify;
+            background: linear-gradient(to right, rgba(0,0,0,0.6) 50%, transparent 50%);
+            background-size: 200% 100%; background-position: 100% 0;
+            padding: 10px 15px; animation: typewriterMarker 0.8s ease-out 2.4s forwards; }
+        .section-title { font-size: 1em; font-weight: 500; margin-top: 30px; margin-bottom: 15px; letter-spacing: 0.05em;
+            background: linear-gradient(to right, rgba(0,0,0,0.6) 50%, transparent 50%);
+            background-size: 200% 100%; background-position: 100% 0;
+            padding: 8px 15px; display: inline-block; animation: typewriterMarker 0.6s ease-out 2.6s forwards; }
+        .timeline { font-size: 0.9em; line-height: 1.9; color: #fff;
+            background: linear-gradient(to right, rgba(0,0,0,0.6) 50%, transparent 50%);
+            background-size: 200% 100%; background-position: 100% 0;
+            padding: 10px 15px; animation: typewriterMarker 0.8s ease-out 2.8s forwards; }
+        .timeline-item { display: flex; margin-bottom: 8px; }
+        .year { min-width: 60px; color: #e0e0e0; }
+        .description { flex: 1; }
     </style>
 </head>
 <body>
@@ -445,13 +134,14 @@
         <div class="ripple ripple4"></div>
         <div class="ripple ripple5"></div>
     </div>
-    
+
     <div class="logo">
         <a href="index.html">Technetope</a>
     </div>
-    
+
     <h1>Artists</h1>
-    
+
+    <!-- アーティスト情報 -->
     <div class="artist">
         <div class="artist-image">
             <img src="https://raw.githubusercontent.com/Rhizobium-gits/Technetope/main/figure/a3.jpg" alt="齋藤 淳平" onerror="this.parentElement.innerHTML='Image: 齋藤 淳平'">
@@ -462,10 +152,10 @@
                 2005年生まれ。小さい頃からモノづくりが好きで、ハードウェアを使った新たな体験を創ることに情熱を注ぐ。現在、燈 -Tomoshibi Technology- のリーダーを務めながら、慶應義塾大学理工学部情報工学科の鳴海研究室にて技術職員として活動。SFC-RGのArchに所属し、孫正義育英財団6期生(2022)、情報科学の達人4期生(2023)、MakersUniversity U18 8期生(2023)、未踏ジュニア(2023)、SecHack365(2025)など、様々な技術コミュニティに参加。ロボティクス、ハードウェア開発、新しいインタラクティブ体験の創出を中心に活動し、特にパフォーマティブロボティクスの分野において国際的なRoboCup大会での複数回の優勝実績を持つ。
             </div>
             <div class="section-title">大会記録</div>
-                <div class="timeline">
-                    <div class="timeline-item">
-                      <span class="year">2024</span>
-                      <span class="description">Sato, T., Abe, K., Koseki, J. et al. Survivability and life support in sealed mini-ecosystems with simulated planetary soils. <i>Sci Rep</i> 14, 26322 (2024). https://doi.org/10.1038/s41598-024-75328-x</span>
+            <div class="timeline">
+                <div class="timeline-item">
+                    <span class="year">2024</span>
+                    <span class="description">Sato, T., Abe, K., Koseki, J. et al. Survivability and life support in sealed mini-ecosystems with simulated planetary soils. <i>Sci Rep</i> 14, 26322 (2024). https://doi.org/10.1038/s41598-024-75328-x</span>
                 </div>
                 <div class="timeline-item">
                     <span class="year">2023</span>
@@ -474,7 +164,7 @@
             </div>
         </div>
     </div>
-    
+
     <div class="artist">
         <div class="artist-image">
             <img src="https://raw.githubusercontent.com/Rhizobium-gits/Technetope/main/figure/a2.jpg" alt="清水 紘輔" onerror="this.parentElement.innerHTML='Image: 清水 紘輔'">
@@ -485,10 +175,10 @@
                 清水紘輔は、インタラクティブシステム、感性情報処理、ヒューマンコンピュータインタラクションを中心とした研究・制作活動を行う。現在、筑波大学情報学群情報メディア創成学類に在学(2024年-現在)し、テクノロジーと芸術表現を架橋する研究に取り組む。インタラクティブシステムデザイン、感性的インタフェース開発、バーチャルリアリティ応用を研究領域とし、学術会議と芸術展示の両方で活発に活動。ヒューマンインタフェース学会、日本バーチャルリアリティ学会、日本ソフトウェア科学会など複数の学術団体に所属。研究発表は、WISS(インタラクティブシステムとソフトウェアに関するワークショップ)、NICOGRAPH、ISASE(国際感性工学シンポジウム)などの主要学会で行われ、芸術作品はSIGGRAPH Asia 2024、Laval Virtual Asia 2024 & 2025などの主要展示会に出展。日本財団の支援による共同研究にも従事。
             </div>
             <div class="section-title">論文/国際学会採択</div>
-                <div class="timeline">
-                    <div class="timeline-item">
-                      <span class="year">2024</span>
-                      <span class="description">Sato, T., Abe, K., Koseki, J. et al. Survivability and life support in sealed mini-ecosystems with simulated planetary soils. <i>Sci Rep</i> 14, 26322 (2024). https://doi.org/10.1038/s41598-024-75328-x</span>
+            <div class="timeline">
+                <div class="timeline-item">
+                    <span class="year">2024</span>
+                    <span class="description">Sato, T., Abe, K., Koseki, J. et al. Survivability and life support in sealed mini-ecosystems with simulated planetary soils. <i>Sci Rep</i> 14, 26322 (2024).</span>
                 </div>
                 <div class="timeline-item">
                     <span class="year">2023</span>
@@ -497,30 +187,15 @@
             </div>
             <div class="section-title">受賞歴等</div>
             <div class="timeline">
-                <div class="timeline-item">
-                    <span class="year">2024</span>
-                    <span class="description">TOP100 -DOWNLOADED ARTICLES- 2024 (Scientific Reports・Nature Portfolio)</span>
-                </div>
-                <div class="timeline-item">
-                    <span class="year">2023</span>
-                    <span class="description">日本植物生理学会(JSPP) 奨励賞 (第64回年会 高校生発表の部)</span>
-                </div>
-                <div class="timeline-item">
-                    <span class="year"></span>
-                    <span class="description">京都大学宇宙ユニットシンポジウム(第16回) 優秀賞 (京都大学宇宙ユニット)</span>
-                </div>
-                <div class="timeline-item">
-                    <span class="year">2022</span>
-                    <span class="description">サイエンスキャッスル2022 中国四国大会　優秀ポスター賞 (Leave a nest Inc.)</span>
-                </div>
-                <div class="timeline-item">
-                    <span class="year"></span>
-                    <span class="description">​日本生化学会(JBS) 銀賞 (第95回年会 高校生発表の部)</span>
-                </div>
+                <div class="timeline-item"><span class="year">2024</span><span class="description">TOP100 -DOWNLOADED ARTICLES- 2024 (Scientific Reports・Nature Portfolio)</span></div>
+                <div class="timeline-item"><span class="year">2023</span><span class="description">日本植物生理学会(JSPP) 奨励賞 (第64回年会 高校生発表の部)</span></div>
+                <div class="timeline-item"><span class="year"></span><span class="description">京都大学宇宙ユニットシンポジウム(第16回) 優秀賞 (京都大学宇宙ユニット)</span></div>
+                <div class="timeline-item"><span class="year">2022</span><span class="description">サイエンスキャッスル2022 中国四国大会　優秀ポスター賞 (Leave a nest Inc.)</span></div>
+                <div class="timeline-item"><span class="year"></span><span class="description">日本生化学会(JBS) 銀賞 (第95回年会 高校生発表の部)</span></div>
             </div>
         </div>
     </div>
-    
+
     <div class="artist">
         <div class="artist-image">
             <img src="https://raw.githubusercontent.com/Rhizobium-gits/Technetope/main/figure/a1.jpg" alt="佐藤 翼" onerror="this.parentElement.innerHTML='Image: 佐藤 翼'">
@@ -528,57 +203,49 @@
         <div class="artist-content">
             <h2>佐藤 翼 / Tsubasa <b>SATO</b></h2>
             <div class="bio">
-                2006年生まれ。慶應義塾大学 環境情報学部に在学中(2025-現在)。2019年より、宇宙移住と背景とした縮小型人工閉鎖生態系の維持システムの構築に関する実験と地球外惑星の模擬土壌を用いた生存可能性に関する実験を行い、現在も地球生態系のバイオームの模倣に関する実験を継続している。2025年より慶應義塾大学 先端生命科学研究会 腸内細菌グループに所属し、低重力・過重力環境でのヒト腸内細菌叢の動態メカニズムに関する研究を行っている。また、東京科学大学(旧東京医科歯科大学)難治疾患研究所にて技術支援員として、時間列動態解析と深層学習モデル・細菌培養装置の開発に携わっている。学術活動以外では、ADvance Labの宇宙部門リーダーとして、将来の月面インフラのための水溶性月面コンクリート開発に取り組む。微生物学、システム生物学、有人宇宙学にまたがる学際的アプローチを積極的に行っている。Technoteopeプロジェクトではプロジェクトの立案と生態系模倣監修と作品紹介を担当。
+                2006年生まれ。慶應義塾大学 環境情報学部に在学中(2025-現在)。2019年より、宇宙移住と背景とした縮小型人工閉鎖生態系の維持システムの構築に関する実験と地球外惑星の模擬土壌を用いた生存可能性に関する実験を行い、現在も地球生態系のバイオームの模倣に関する実験を継続している。2025年より慶應義塾大学 先端生命科学研究会 腸内細菌グループに所属し、低重力・過重力環境でのヒト腸内細菌叢の動態メカニズムに関する研究を行っている。また、東京科学大学(旧東京医科歯科大学)難治疾患研究所にて技術支援員として、時間列動態解析と深層学習モデル・細菌培養装置の開発に携わっている。学術活動以外では、ADvance Labの宇宙部門リーダーとして、将来の月面インフラのための水溶性月面コンクリート開発に取り組む。微生物学、システム生物学、有人宇宙学にまたがる学際的アプローチを積極的に行っている。Technetopeプロジェクトではプロジェクトの立案と生態系模倣監修と作品紹介を担当。
             </div>
             <div class="section-title">論文/国際学会採択</div>
-                <div class="timeline">
-                    <div class="timeline-item">
-                      <span class="year">2024</span>
-                      <span class="description">Sato, T., Abe, K., Koseki, J. et al. Survivability and life support in sealed mini-ecosystems with simulated planetary soils. <i>Sci Rep</i> 14, 26322 (2024). https://doi.org/10.1038/s41598-024-75328-x</span>
-                </div>
-                <div class="timeline-item">
-                    <span class="year">2023</span>
-                    <span class="description">Sato, T. 「Survivability and life support in sealed mini-ecosystems with simulated planetary soils」7th MVA Global Workshop & Symposium (MVA2023)</span>
-                </div>
+            <div class="timeline">
+                <div class="timeline-item"><span class="year">2024</span><span class="description">Sato, T., Abe, K., Koseki, J. et al. Survivability and life support in sealed mini-ecosystems with simulated planetary soils. <i>Sci Rep</i> 14, 26322 (2024).</span></div>
+                <div class="timeline-item"><span class="year">2023</span><span class="description">Sato, T. 「Survivability and life support in sealed mini-ecosystems with simulated planetary soils」7th MVA Global Workshop & Symposium (MVA2023)</span></div>
             </div>
             <div class="section-title">受賞歴等</div>
             <div class="timeline">
-                <div class="timeline-item">
-                    <span class="year">2025</span>
-                    <span class="description">TOP100 -DOWNLOADED ARTICLES- 2024 (Scientific Reports・Nature Portfolio)</span>
-                </div>
-                <div class="timeline-item">
-                    <span class="year">2023</span>
-                    <span class="description">日本植物生理学会(JSPP) 奨励賞 (第64回年会 高校生発表の部)</span>
-                </div>
-                <div class="timeline-item">
-                    <span class="year"></span>
-                    <span class="description">京都大学宇宙ユニットシンポジウム(第16回) 優秀賞 (京都大学宇宙ユニット)</span>
-                </div>
-                <div class="timeline-item">
-                    <span class="year">2022</span>
-                    <span class="description">サイエンスキャッスル2022 中国四国大会　優秀ポスター賞 (Leave a nest Inc.)</span>
-                </div>
-                <div class="timeline-item">
-                    <span class="year"></span>
-                    <span class="description">​日本生化学会(JBS) 銀賞 (第95回年会 高校生発表の部)</span>
-                </div>
+                <div class="timeline-item"><span class="year">2025</span><span class="description">TOP100 -DOWNLOADED ARTICLES- 2024 (Scientific Reports・Nature Portfolio)</span></div>
+                <div class="timeline-item"><span class="year">2023</span><span class="description">日本植物生理学会(JSPP) 奨励賞 (第64回年会 高校生発表の部)</span></div>
+                <div class="timeline-item"><span class="year"></span><span class="description">京都大学宇宙ユニットシンポジウム(第16回) 優秀賞 (京都大学宇宙ユニット)</span></div>
+                <div class="timeline-item"><span class="year">2022</span><span class="description">サイエンスキャッスル2022 中国四国大会　優秀ポスター賞 (Leave a nest Inc.)</span></div>
+                <div class="timeline-item"><span class="year"></span><span class="description">日本生化学会(JBS) 銀賞 (第95回年会 高校生発表の部)</span></div>
             </div>
         </div>
     </div>
-    
+
     <script>
-        // 背景画像の読み込みを待つ
         const bgImage = new Image();
         bgImage.src = 'https://raw.githubusercontent.com/Rhizobium-gits/Technetope/main/figure/background_cloud4.png';
-        
-        bgImage.onload = function() {
-            document.body.classList.add('loaded');
-        };
-        
-        bgImage.onerror = function() {
-            document.body.classList.add('loaded');
-        };
+        bgImage.onload = () => document.body.classList.add('loaded');
+        bgImage.onerror = () => document.body.classList.add('loaded');
+
+        const h1 = document.querySelector("h1");
+        const text = h1.textContent.trim();
+        h1.textContent = "";
+
+        const spans = text.split("").map(ch => {
+            const span = document.createElement("span");
+            span.textContent = ch;
+            h1.appendChild(span);
+            return span;
+        });
+
+        setTimeout(() => {
+            const order = spans.map((_, i) => i).sort(() => Math.random() - 0.5);
+            order.forEach((i, index) => {
+                setTimeout(() => {
+                    spans[i].classList.add("serif");
+                }, index * 250 + Math.random() * 300);
+            });
+        }, 1700);
     </script>
 </body>
 </html>
