@@ -14,6 +14,7 @@ struct PlaybackItem {
   uint64_t start_time_us = 0;
   float gain = 1.0f;
   bool loop = false;
+  bool is_stop = false;
 };
 
 class PlaybackQueue {

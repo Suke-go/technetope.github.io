@@ -4,6 +4,7 @@
 #include <mbedtls/aes.h>
 
 #include <array>
+#include <cstdint>
 #include <vector>
 
 #include "NtpClient.h"
@@ -31,6 +32,7 @@ class OscReceiver {
   std::array<uint8_t, 16> iv_{};
 
   bool decryptInPlace(std::vector<uint8_t>& buffer);
+  std::array<uint8_t, 16> deriveIv(uint64_t counter) const;
   void handlePacket(const uint8_t* data, size_t length, const NtpClient& ntp,
                     PlaybackQueue& queue, const PresetStore& presets);
 };

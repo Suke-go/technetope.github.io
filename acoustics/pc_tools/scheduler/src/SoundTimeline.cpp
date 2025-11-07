@@ -127,9 +127,10 @@ SoundTimeline SoundTimeline::fromJsonFile(const std::filesystem::path& path) {
     for (const auto& eventJson : root.at("events")) {
         timeline.events_.push_back(parseEvent(eventJson));
     }
-    std::sort(timeline.events_.begin(), timeline.events_.end(), [](const auto& a, const auto& b) {
-        return a.offsetSeconds < b.offsetSeconds;
-    });
+    std::stable_sort(timeline.events_.begin(), timeline.events_.end(),
+                     [](const auto& a, const auto& b) {
+                         return a.offsetSeconds < b.offsetSeconds;
+                     });
 
     return timeline;
 }

@@ -13,10 +13,11 @@ PCツール群は C++17 + CMake を想定した再構築中であり、以下の
 4. テスト実装後は `ctest --test-dir build` で `Catch2` ベースのテストを実行。
 
 実行例:
-- Scheduler: `./build/scheduler/agent_a_scheduler acoustics/pc_tools/scheduler/examples/basic_timeline.json --host 192.168.10.255 --port 9000 --bundle-spacing 0.02 --target-map mappings/voices.json --default-targets dev-001,dev-002,dev-003`
+- Scheduler: `./build/scheduler/agent_a_scheduler acoustics/pc_tools/scheduler/examples/basic_timeline.json --host 192.168.10.255 --port 9000 --bundle-spacing 0.02 --target-map mappings/voices.json --default-targets dev-001,dev-002,dev-003 --osc-config acoustics/secrets/osc_config.json`
+  - `--osc-config`（デフォルト `acoustics/secrets/osc_config.json`）でファームウェアと共有する鍵/IV を読み込み、AES-256-CTR を常時有効化する。CLI 実行前に `acoustics/tools/secrets/gen_headers.py` で JSON → `Secrets.h` を生成しておくこと。
   - `--dry-run` で送信せず内容を確認。表示にはタイムタグ、ターゲット ID、プリセット ID が含まれる。
   - `--base-time 2024-05-01T21:00:00Z` でリードタイムの基準時刻を指定。タイムラインおよびオーバーライド値は 3 秒以上でなければならない。
-- Monitor: `./build/monitor/agent_a_monitor --host 0.0.0.0 --port 9100 --registry state/devices.json --csv logs/heartbeat.csv`
+- Monitor: `./build/monitor/agent_a_monitor --host 0.0.0.0 --port 19100 --registry state/devices.json --csv logs/heartbeat.csv`
   - `--count` で受信パケット上限、`Ctrl+C` または `SIGINT` で停止。
   - `/announce` を受け取ったデバイスは `state/devices.json` に追記される。
 
@@ -28,16 +29,16 @@ PCツール群は C++17 + CMake を想定した再構築中であり、以下の
 
 ### ファイアウォール設定例
 
-モニタは UDP/9100 を待ち受けるため、ホスト OS のファイアウォールでポートを開放する必要があります。
+モニタは UDP/19100 を待ち受けるため、ホスト OS のファイアウォールでポートを開放する必要があります。
 
 - **nftables**
   ```bash
-  sudo nft insert rule inet filter input udp dport 9100 accept
+  sudo nft insert rule inet filter input udp dport 19100 accept
   sudo nft list chain inet filter input
   ```
 - **iptables**
   ```bash
-  sudo iptables -I INPUT -p udp --dport 9100 -j ACCEPT
+  sudo iptables -I INPUT -p udp --dport 19100 -j ACCEPT
   sudo iptables-save | sudo tee /etc/iptables/iptables.rules
   ```
 

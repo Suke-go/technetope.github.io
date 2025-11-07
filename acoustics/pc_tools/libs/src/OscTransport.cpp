@@ -3,6 +3,8 @@
 #include "acoustics/osc/OscPacket.h"
 
 #include <spdlog/spdlog.h>
+#include <cstddef>
+#include <limits>
 
 namespace acoustics::osc {
 
@@ -81,6 +83,24 @@ bool OscSender::broadcastEnabled() const {
     return broadcast_;
 }
 
+void OscSender::enableEncryption(const OscEncryptor::Key256& key,
+                                 const OscEncryptor::Iv128& iv) {
+    std::lock_guard lock(mutex_);
+    encryptor_.setKey(key, iv);
+    sendCounter_ = 0;
+}
+
+void OscSender::disableEncryption() {
+    std::lock_guard lock(mutex_);
+    encryptor_.clear();
+    sendCounter_ = 0;
+}
+
+bool OscSender::encryptionEnabled() const {
+    std::lock_guard lock(mutex_);
+    return encryptor_.enabled();
+}
+
 void OscSender::send(const Message& message) {
     sendPacket(encodeMessage(message));
 }
@@ -91,8 +111,26 @@ void OscSender::send(const Bundle& bundle) {
 
 void OscSender::sendPacket(const std::vector<std::uint8_t>& payload) {
     std::lock_guard lock(mutex_);
+    std::vector<std::uint8_t> buffer;
+    if (encryptor_.enabled()) {
+        if (sendCounter_ == std::numeric_limits<std::uint64_t>::max()) {
+            spdlog::error("OSC encryption counter exhausted");
+            return;
+        }
+        const std::uint64_t counter = ++sendCounter_;
+        auto iv = encryptor_.deriveIv(counter);
+        std::vector<std::uint8_t> ciphertext = encryptor_.encrypt(payload, iv);
+
+        buffer.resize(sizeof(counter) + ciphertext.size());
+        for (std::size_t i = 0; i < sizeof(counter); ++i) {
+            buffer[i] = static_cast<std::uint8_t>((counter >> (56U - static_cast<unsigned>(i) * 8U)) & 0xFFU);
+        }
+        std::copy(ciphertext.begin(), ciphertext.end(), buffer.begin() + static_cast<std::ptrdiff_t>(sizeof(counter)));
+    } else {
+        buffer = payload;
+    }
     std::error_code ec;
-    socket_.send_to(asio::buffer(payload), destination_, 0, ec);
+    socket_.send_to(asio::buffer(buffer), destination_, 0, ec);
     if (ec) {
         spdlog::warn("OSC send failed: {}", ec.message());
     }
@@ -144,13 +182,26 @@ void OscListener::handleReceive(std::error_code ec, std::size_t bytesReceived) {
     }
 
     try {
+        spdlog::debug("OSC raw packet from {}:{} ({} bytes)",
+                      remoteEndpoint_.address().to_string(),
+                      remoteEndpoint_.port(),
+                      bytesReceived);
         std::vector<std::uint8_t> payload(buffer_.begin(), buffer_.begin() + static_cast<std::ptrdiff_t>(bytesReceived));
         Packet packet = decodePacket(payload);
+        if (spdlog::should_log(spdlog::level::debug)) {
+            spdlog::debug("OSC packet decoded from {}:{} ({} bytes)",
+                          remoteEndpoint_.address().to_string(),
+                          remoteEndpoint_.port(),
+                          bytesReceived);
+        }
         if (handler_) {
             handler_(packet, remoteEndpoint_);
         }
     } catch (const std::exception& ex) {
-        spdlog::warn("Failed to decode OSC packet: {}", ex.what());
+        spdlog::warn("Failed to decode OSC packet from {}:{}: {}",
+                     remoteEndpoint_.address().to_string(),
+                     remoteEndpoint_.port(),
+                     ex.what());
     }
 
     if (running_.load()) {

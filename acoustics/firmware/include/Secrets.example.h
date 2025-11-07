@@ -14,7 +14,7 @@ constexpr const char WIFI_SECONDARY_PASS[] = "";
 
 // OSC endpoints
 constexpr uint16_t OSC_LISTEN_PORT = 9000;
-constexpr uint16_t HEARTBEAT_REMOTE_PORT = 9100;
+constexpr uint16_t HEARTBEAT_REMOTE_PORT = 19100;
 constexpr const char HEARTBEAT_REMOTE_HOST[] = "192.168.4.2";
 
 // NTP settings (override in Secrets.h)

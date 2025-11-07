@@ -46,6 +46,8 @@ acoustics/firmware/.piolibdeps/
 
 # Firmware secrets (local only)
 acoustics/firmware/include/Secrets.h
+secrets/
+acoustics/secrets/osc_config.json
 
 # IDE settings
 .idea/

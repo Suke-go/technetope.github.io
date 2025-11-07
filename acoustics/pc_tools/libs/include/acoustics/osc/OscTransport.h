@@ -1,10 +1,12 @@
 #pragma once
 
 #include "acoustics/osc/OscPacket.h"
+#include "acoustics/osc/OscEncryptor.h"
 
 #include <asio.hpp>
 
 #include <array>
+#include <cstdint>
 #include <atomic>
 #include <chrono>
 #include <functional>
@@ -50,6 +52,11 @@ public:
     void setBroadcastEnabled(bool enable);
     bool broadcastEnabled() const;
 
+    void enableEncryption(const OscEncryptor::Key256& key,
+                          const OscEncryptor::Iv128& iv);
+    void disableEncryption();
+    bool encryptionEnabled() const;
+
     void send(const Message& message);
     void send(const Bundle& bundle);
 
@@ -60,6 +67,8 @@ private:
     Endpoint destination_;
     bool broadcast_{false};
     mutable std::mutex mutex_;
+    OscEncryptor encryptor_;
+    std::uint64_t sendCounter_{0};
 };
 
 class OscListener {

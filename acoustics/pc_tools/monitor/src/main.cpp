@@ -5,6 +5,7 @@
 #include "CLI11.hpp"
 
 #include <asio.hpp>
+#include <spdlog/spdlog.h>
 
 #include <atomic>
 #include <cmath>
@@ -18,8 +19,10 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <sstream>
 #include <string>
 #include <thread>
+#include <type_traits>
 #include <unordered_map>
 #include <vector>
 
@@ -33,10 +36,11 @@ void handleSignal(int) {
 
 struct MonitorOptions {
     std::string listenHost{"0.0.0.0"};
-    std::uint16_t port{9100};
+    std::uint16_t port{19100};
     std::optional<std::filesystem::path> csv;
     std::uint64_t maxPackets{0};
     bool quiet{false};
+    bool debug{false};
     std::filesystem::path registryPath{"state/devices.json"};
 };
 
@@ -94,7 +98,29 @@ struct HeartbeatData {
     std::string deviceId;
     std::int32_t sequence;
     double sentSeconds;
+    std::optional<std::int32_t> queueSize;
+    std::optional<bool> isPlaying;
 };
+
+std::string describeArgument(const acoustics::osc::Argument& arg) {
+    return std::visit(
+        [](const auto& value) -> std::string {
+            using T = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<T, std::int32_t>) {
+                return "int32(" + std::to_string(value) + ")";
+            } else if constexpr (std::is_same_v<T, float>) {
+                return "float(" + std::to_string(value) + ")";
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                return "string(\"" + value + "\")";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                return std::string("bool(") + (value ? "true" : "false") + ")";
+            } else if constexpr (std::is_same_v<T, acoustics::osc::Blob>) {
+                return "blob(size=" + std::to_string(value.size()) + ")";
+            }
+            return "unknown";
+        },
+        arg);
+}
 
 HeartbeatData parseHeartbeat(const acoustics::osc::Message& message) {
     if (message.address != "/heartbeat" || message.arguments.size() < 3) {
@@ -118,9 +144,25 @@ HeartbeatData parseHeartbeat(const acoustics::osc::Message& message) {
         auto secs = std::get<std::int32_t>(message.arguments[2]);
         auto micros = std::get<std::int32_t>(message.arguments[3]);
         data.sentSeconds = static_cast<double>(secs) +
-                           static_cast<double>(micros) / 1'000'000.0;
+                          static_cast<double>(micros) / 1'000'000.0;
     } else {
         data.sentSeconds = argumentToSeconds(message.arguments[2]);
+    }
+
+    if (message.arguments.size() >= 5) {
+        if (const auto* queue = std::get_if<std::int32_t>(&message.arguments[4])) {
+            data.queueSize = *queue;
+        }
+    }
+
+    if (message.arguments.size() >= 6) {
+        if (const auto* playingBool = std::get_if<bool>(&message.arguments[5])) {
+            data.isPlaying = *playingBool;
+        } else if (const auto* playingInt = std::get_if<std::int32_t>(&message.arguments[5])) {
+            data.isPlaying = (*playingInt != 0);
+        } else if (const auto* playingFloat = std::get_if<float>(&message.arguments[5])) {
+            data.isPlaying = (*playingFloat != 0.0f);
+        }
     }
     return data;
 }
@@ -147,10 +189,23 @@ void processMessage(const acoustics::osc::Message& message,
                     std::unordered_map<std::string, DeviceStats>& stats,
                     std::ofstream* csvStream,
                     acoustics::common::DeviceRegistry* registry) {
+    spdlog::debug("processMessage: address={} arg_count={}", message.address, message.arguments.size());
+
     HeartbeatData data;
     try {
         data = parseHeartbeat(message);
-    } catch (const std::exception&) {
+    } catch (const std::exception& ex) {
+        std::ostringstream argStream;
+        for (std::size_t i = 0; i < message.arguments.size(); ++i) {
+            if (i > 0) {
+                argStream << ", ";
+            }
+            argStream << describeArgument(message.arguments[i]);
+        }
+        spdlog::warn("Failed to parse heartbeat: {} (address={} args=[{}])",
+                     ex.what(),
+                     message.address,
+                     argStream.str());
         return;
     }
 
@@ -158,7 +213,25 @@ void processMessage(const acoustics::osc::Message& message,
     double arrivalSeconds = toEpochSeconds(arrival);
     double latencyMs = (arrivalSeconds - data.sentSeconds) * 1000.0;
 
-    updateStats(stats[data.deviceId], latencyMs);
+    auto& deviceStats = stats[data.deviceId];
+    updateStats(deviceStats, latencyMs);
+    if (data.queueSize || data.isPlaying.has_value()) {
+        spdlog::debug("Heartbeat parsed: id={} seq={} sent_seconds={:.6f} latency_ms={:.3f} count={} queue={} playing={}",
+                      data.deviceId,
+                      data.sequence,
+                      data.sentSeconds,
+                      latencyMs,
+                      deviceStats.count,
+                      data.queueSize ? std::to_string(*data.queueSize) : "n/a",
+                      data.isPlaying.has_value() ? (data.isPlaying.value() ? "yes" : "no") : "n/a");
+    } else {
+        spdlog::debug("Heartbeat parsed: id={} seq={} sent_seconds={:.6f} latency_ms={:.3f} count={}",
+                      data.deviceId,
+                      data.sequence,
+                      data.sentSeconds,
+                      latencyMs,
+                      deviceStats.count);
+    }
 
     if (registry) {
         registry->recordHeartbeat(data.deviceId, latencyMs, arrival);
@@ -166,7 +239,14 @@ void processMessage(const acoustics::osc::Message& message,
 
     if (!options.quiet) {
         std::cout << "[" << data.deviceId << "] seq=" << data.sequence
-                  << " latency=" << std::fixed << std::setprecision(3) << latencyMs << " ms" << std::endl;
+                  << " latency=" << std::fixed << std::setprecision(3) << latencyMs << " ms";
+        if (data.queueSize) {
+            std::cout << " queue=" << *data.queueSize;
+        }
+        if (data.isPlaying.has_value()) {
+            std::cout << " playing=" << (data.isPlaying.value() ? "yes" : "no");
+        }
+        std::cout << std::endl;
     }
 
     if (csvStream) {
@@ -263,6 +343,16 @@ void processPacket(const acoustics::osc::Packet& packet,
                    std::ofstream* csvStream,
                    acoustics::common::DeviceRegistry* registry) {
     auto handle = [&](const acoustics::osc::Message& msg) {
+        if (spdlog::should_log(spdlog::level::debug)) {
+            std::ostringstream argStream;
+            for (std::size_t i = 0; i < msg.arguments.size(); ++i) {
+                if (i > 0) {
+                    argStream << ", ";
+                }
+                argStream << describeArgument(msg.arguments[i]);
+            }
+            spdlog::debug("processPacket: dispatching address={} args=[{}]", msg.address, argStream.str());
+        }
         if (registry && msg.address == "/announce") {
             processAnnounce(msg, options, *registry);
             return;
@@ -273,6 +363,7 @@ void processPacket(const acoustics::osc::Packet& packet,
     if (const auto* message = std::get_if<acoustics::osc::Message>(&packet)) {
         handle(*message);
     } else if (const auto* bundle = std::get_if<acoustics::osc::Bundle>(&packet)) {
+        spdlog::debug("processPacket: bundle with {} elements", bundle->elements.size());
         for (const auto& msg : bundle->elements) {
             handle(msg);
         }
@@ -315,12 +406,21 @@ int main(int argc, char** argv) {
     app.add_option("--csv", options.csv, "Append results to CSV file");
     app.add_option("--count", options.maxPackets, "Stop after N packets (0 = unlimited)");
     app.add_flag("--quiet", options.quiet, "Suppress console output");
+    app.add_flag("--debug", options.debug, "Enable verbose debug logging");
     app.add_option("--registry", options.registryPath, "Device registry JSON path");
 
     try {
         app.parse(argc, argv);
     } catch (const CLI::ParseError& e) {
         return app.exit(e);
+    }
+
+    spdlog::set_pattern("%Y-%m-%d %H:%M:%S.%e [%^%l%$] %v");
+    if (options.debug) {
+        spdlog::set_level(spdlog::level::debug);
+        spdlog::debug("Debug logging enabled");
+    } else {
+        spdlog::set_level(spdlog::level::info);
     }
 
     std::signal(SIGINT, handleSignal);

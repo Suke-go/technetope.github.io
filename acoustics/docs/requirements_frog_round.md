@@ -38,6 +38,7 @@ This document consolidates the functional and non-functional requirements for op
 4. CLI options shall allow loading an external CSV/JSON mapping of logical voices to device IDs to support the round arrangement without rewriting the timeline.
 5. Dry-run mode must display derived timetags, targets, and preset IDs so operators can verify bundle contents before transmission.
 6. Scheduler must throttle bundle emission by at least 10 ms spacing to avoid AP overload when dispatching large batches.
+7. Scheduler shall always enable AES-256-CTR encryption by loading the shared key/IV from `osc_config.json` (via `--osc-config`, defaulting to `acoustics/secrets/osc_config.json`), ensuring the firmware and CLI consume the same secrets without duplicating material in version control.
 
 ## 6. Control & Integration Requirements
 1. Scheduler functionality shall be exposed through a reusable C++ library that can be linked by the CLI, automated scripts, and any GUI layer without duplicating logic.
@@ -72,7 +73,7 @@ This document consolidates the functional and non-functional requirements for op
 1. UDP broadcast/multicast usage must comply with the AP configuration; operational procedures must include enabling broadcast on the chosen SSID and pinning to a 5 GHz channel when possible.
 2. Scheduler shall detect and report socket send failures; repeated failures (>3 within 1 s) must be surfaced as a critical error.
 3. For high-density tests (≥20 devices), operators must stagger firmware boots to prevent simultaneous DHCP storms.
-4. Network provisioning documents shall include firewall rule templates (nftables/iptables) ensuring UDP 9000/9100 accessibility.
+4. Network provisioning documents shall include firewall rule templates (nftables/iptables) ensuring UDP 9000/19100 accessibility.
 5. Control services shall retain persistent mappings between MAC addresses, firmware IDs, and aliases, enabling operators to address devices even before the next announce heartbeat.
 6. Upon heartbeat recovery after a dropout, the master PC shall automatically verify time synchronisation (force NTP sync if stale) and provide an option to requeue any missed playback jobs for the affected device set.
 7. Operational documentation shall describe the recovery workflow for network disruptions, including manual overrides and how to confirm the device has rejoined the active round.

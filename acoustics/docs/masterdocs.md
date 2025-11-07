@@ -67,7 +67,7 @@
 - **OSC over UDP**を使用し、1回の送信で全台に届くようブロードキャストまたはマルチキャストを利用する。  
 - メッセージはバイナリ形式（例: `[sample_id:int][gain:float][pan:float][flags:uint8]`）で送ると、Stick側の解析負荷が軽くなる。  
 - Stick起動時に端末ID（MACアドレス＋任意ニックネームなど）をPCへ広告させ、PC側でID/グループごとのターゲットリストを管理する。イベントやCLIから特定ID群へ個別送信できるようデータモデルを拡張する。  
-- 暗号化が必要な場合はESP32のハードウェアAES（AES-CTR/AES-GCM）を使い、鍵の配布・更新手順を決めておく。  
+- 暗号化はESP32のハードウェアAES（AES-CTR/AES-GCM）を使い、鍵の配布・更新手順を決めておく。現在の実装では `acoustics/secrets/osc_config.json` を唯一のソースとし、PlatformIOビルド時に `Secrets.h` へ展開、PC側も `--osc-config` で同じJSONを読み込む設計に統一する。  
 - パケット欠損が起きた時に備えて、同じ命令を2回送信する、または簡易ACKチャネルを設けると安心。
 
 ### よく出る疑問と答え
@@ -78,6 +78,15 @@
   - 内蔵Flashの音を差し替える場合は、OTAやセットアップスクリプトで書き換える手順を用意します。外付けmicroSDを使う設計も検討できます。
 - **Q: 初心者でも運用できる？**  
   - Stickごとに「起動→時計合わせ→音準備→待機」の流れが自動で動くようにしておき、PC側もGUIやスクリプトで「タイムライン作成→送り出し」ができるようにすれば、作業はかなり簡単になります。
+
+### Secrets / OSC Config 管理
+- 機密情報は `acoustics/secrets/osc_config.json` に集約する。構造は以下の通り:
+  - `wifi.primary/secondary.{ssid,pass}`
+  - `osc.listen_port`, `osc.key_hex`, `osc.iv_hex`
+  - `heartbeat.{host,port}`
+  - `ntp.{server,offset,interval_ms}`
+- PlatformIO ビルド前に `python3 acoustics/tools/secrets/gen_headers.py`（または `pio run` の自動実行）で JSON から `firmware/include/Secrets.h` を生成する。ファームウェアは常にこのヘッダー経由で値を参照する。
+- PCツールは `--osc-config` オプション（デフォルト `acoustics/secrets/osc_config.json`）で同じ JSON を読み取り、AES-256-CTR を常時有効化した状態でOSCを送信する。
 
 ### 仕組みを試すときのチェックリスト（PoC）
 1. Stickが正しい時刻をとれているか（NTP同期ログを見る）。  
@@ -232,8 +241,8 @@
     - UDPなので欠損/重複が起こり得る。コマンドは冪等に設計し、`sequence_id` などで重複検知を行う。
     - 同じ命令を二重送信する場合、再生キューが2件にならないようGuardを入れる。
 - **暗号と鍵管理**
-    - AES鍵をコードにベタ書きしない。環境変数や安全な設定ファイルから読み込む。
-    - 鍵ローテーション時には、旧鍵を受け付ける猶予を設け、切替ログを残す。
+    - AES鍵は `acoustics/secrets/osc_config.json` にのみ保存し、PlatformIOビルド/CLI実行時は常にこのファイルから読み込む。コードやリポジトリに平文の鍵を残さない。
+    - 鍵ローテーション時には、旧JSONをバックアップしつつ新しい `osc_config.json` に切り替え、`python3 acoustics/tools/secrets/gen_headers.py` で `Secrets.h` を再生成した記録を残す。
 - **GUIとバックエンドの整合性**
     - GUIからの操作がバックエンドCLIと衝突しないよう、排他制御またはイベントキューを導入する。
     - GUIで変更したタイムラインが保存されない、反映されないケースを防ぐため、保存前後の状態をログに残し、Undo/Redo設計を検討する。

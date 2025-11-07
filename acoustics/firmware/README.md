@@ -4,9 +4,10 @@ M5StickC Plus2 用のファームウェア実装一式。Wi-Fi 接続、NTP 同�
 
 ## ディレクトリ構成
 - `platformio.ini` : PlatformIO 向けターゲット (`espressif32@6.7.0`) と依存ライブラリ (`M5Unified`, `M5StickCPlus2`, `NTPClient`, `ArduinoJson`, `CNMAT/OSC`) を定義。
-- `include/Secrets.example.h` : Wi-Fi / OSC キー設定のサンプル。運用環境では `Secrets.h` を作成し、リポジトリにコミットしない。
-- `data/manifest.json` : SPIFFS に焼き込むプリセットマニフェストの雛形。`/presets/*.wav` へのパスとゲインを保持。
-- `data/presets/` : サンプルサウンドなど SPIFFS に載せる WAV ファイルを置く。
+- `../secrets/osc_config.example.json` : Wi-Fi/OSC/NTP/Heartbeat の一元設定テンプレート。実運用では `osc_config.json` を作り、バイナリと同じ値を CLI/FW 双方で共有する。
+- `include/Secrets.example.h` : 上記 JSON から自動生成される `Secrets.h` の雛形。`pio run` or `python3 ../tools/secrets/gen_headers.py` が本番値でヘッダーを生成する。
+- `data/manifest.json` : SPIFFS に焼き込むプリセット定義。MOTHER 系もここで一元管理。
+- `data/presets/` : WAV ファイル。`mother_mf/` フォルダ以下に MF 用音源をまとめて配置。
 - `src/main.cpp` : ブートストラップ。各モジュールを初期化し FreeRTOS タスクを起動。
 - `src/modules/` : 機能別クラス群
   - `WiFiManager` : 接続／再接続ロジック
@@ -19,8 +20,10 @@ M5StickC Plus2 用のファームウェア実装一式。Wi-Fi 接続、NTP 同�
 
 ## ビルド・フラッシュ手順
 1. **前提ソフト** : PlatformIO CLI または VSCode 拡張、`espressif32` ボードパッケージ、CH9102 ドライバ。
-2. **Secrets 設定** : `include/Secrets.example.h` を `include/Secrets.h` としてコピーし、Wi-Fi SSID/Password、OSC AES キー/IV、心拍送信先、NTP サーバ (`NTP_SERVER` など) を環境に合わせて埋める。
-3. **プリセット配置** : `data/manifest.json` に再生したいファイルを登録し、`data/presets/` 下に WAV を配置。`pio run -t uploadfs` で SPIFFS に書き込む。
+2. **Secrets 設定** : `acoustics/secrets/osc_config.example.json` を `osc_config.json` にコピーして編集し、Wi-Fi SSID/Password、OSC AES キー/IV、心拍送信先 (`heartbeat.host/port`)、NTP サーバ (`ntp.server` など) を設定する。  
+   `pio run`（または `python3 acoustics/tools/secrets/gen_headers.py`）を実行すると、この JSON から `include/Secrets.h` が自動生成される。生成物は `.gitignore` 済みなのでリポジトリには含めない。
+3. **プリセット配置** : `data/manifest.json` に全プリセットを登録し、WAV を `data/presets/` 配下に置く（例: `data/presets/mother_mf/A4_mf.wav`）。  
+   `pio run -t uploadfs` で SPIFFS を書き込み、その後 `pio run -t upload` でファームを書き込む。
 4. **ビルド & 書き込み**
    ```sh
    pio run

@@ -17,7 +17,6 @@ void NtpClient::seed(uint32_t epoch_seconds) {
   last_sync_ = epoch_seconds;
   last_sync_millis_ = millis();
   synced_ = true;
-  client_.setEpochTime(epoch_seconds);
   Serial.printf("[NTP] Seeded from RTC (epoch=%lu)\n",
                 static_cast<unsigned long>(epoch_seconds));
 }
@@ -29,7 +28,6 @@ bool NtpClient::forceSync(uint32_t timeout_ms) {
       synced_ = true;
       last_sync_ = client_.getEpochTime();
       last_sync_millis_ = millis();
-      client_.setEpochTime(last_sync_);
       Serial.printf("[NTP] Force sync success (epoch=%lu)\n",
                     static_cast<unsigned long>(last_sync_));
       return true;
@@ -47,7 +45,6 @@ void NtpClient::loop() {
   synced_ = true;
   last_sync_ = client_.getEpochTime();
   last_sync_millis_ = millis();
-  client_.setEpochTime(last_sync_);
   Serial.printf("[NTP] Sync update (epoch=%lu)\n",
                 static_cast<unsigned long>(last_sync_));
 }

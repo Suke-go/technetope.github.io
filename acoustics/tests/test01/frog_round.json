@@ -1,0 +1,41 @@
+{
+  "version": "1.1",
+  "default_lead_time": 4.0,
+  "events": [
+    {
+      "offset": -0.5,
+      "address": "/acoustics/play",
+      "targets": ["voice_a"],
+      "args": ["round_ping", 0, 0.70, 0]
+    },
+    {
+      "offset": 0.0,
+      "address": "/acoustics/play",
+      "targets": ["voice_a"],
+      "args": ["frog_voice_a", 0, 0.82, 0]
+    },
+    {
+      "offset": 2.0,
+      "address": "/acoustics/play",
+      "targets": ["voice_b"],
+      "args": ["frog_voice_b", 0, 0.82, 0]
+    },
+    {
+      "offset": 4.0,
+      "address": "/acoustics/play",
+      "targets": ["voice_c"],
+      "args": ["frog_voice_c", 0, 0.82, 0]
+    },
+    {
+      "offset": 6.0,
+      "address": "/acoustics/play",
+      "targets": ["voice_d"],
+      "args": ["frog_voice_d", 0, 0.82, 0]
+    },
+    {
+      "offset": 16.0,
+      "address": "/acoustics/stop",
+      "args": []
+    }
+  ]
+}

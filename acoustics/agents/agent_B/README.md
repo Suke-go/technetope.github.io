@@ -41,6 +41,6 @@
 ### 2025-11-01 進捗メモ (Codex)
 - PlatformIO 設定・ライブラリ依存を `acoustics/firmware/platformio.ini` に定義。
 - `src/main.cpp` 及び各モジュール（NTP/StickCP2/Wi-Fi/OSC/AES/I2S/Heartbeat）を実装し、FreeRTOS タスク分割を済ませた。
-- `include/Secrets.example.h` を追加し、機密情報は `Secrets.h` に切り出す運用に変更。
+- `secrets/osc_config.example.json` + `tools/secrets/gen_headers.py` を追加し、機密情報を JSON 1 箇所で管理してから `Secrets.h` を自動生成する運用に変更。
 - `data/manifest.json` を含む SPIFFS 用アセット雛形とロードロジック (`PresetStore`) を整備。
 - `docs/device_setup.md` / `docs/troubleshooting.md` / `tests/*.md` を更新し、セットアップ〜テスト計画を反映。

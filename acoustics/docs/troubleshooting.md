@@ -2,13 +2,13 @@
 
 ## 1. よくある症状と対処
 - **Wi-Fi に参加しない**
-  - `Secrets.h` の SSID/Password、2.4GHz 強度、MAC フィルタ登録を確認。
+  - `acoustics/secrets/osc_config.json`（およびそこから生成された `Secrets.h`）の SSID/Password、2.4GHz 強度、MAC フィルタ登録を確認。
   - シリアルログで `[WiFi] Connecting to ...` が繰り返される場合は AP 側ログも確認する。
 - **NTP 同期が完了しない**
   - ファイアウォールで UDP/123 が閉じていないか。
   - 企業ネットワークではローカル NTP (例: `192.168.0.1`) を `NtpClient` のホストに設定してビルドする。
 - **OSC 受信エラー (`AES decrypt failed`)**
-  - PC 側送信スクリプトと AES キー/IV が一致しているか。
+  - `--osc-config` で指定している JSON とファームウェアに書き込んだ `osc_config.json` が同じか。変更後は `python3 acoustics/tools/secrets/gen_headers.py` で `Secrets.h` を再生成する。
   - 同一キーで複数端末へ送る場合は、パケット毎に異なる nonce を付与する（CTR モードの要件）。
 - **再生予定時刻より遅れて鳴る**
   - `timetag` が Stick 側の NTP 時刻よりも過去の場合、直ちに再生する。PC 側が十分なリードタイム（> 300ms）を確保しているか確認。

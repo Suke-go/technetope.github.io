@@ -112,6 +112,13 @@ void playbackTask(void* pvParameters) {
 
     auto due = playback_queue.popDue(now_us);
     if (due) {
+      if (due->is_stop) {
+        Serial.println("[Playback] Stop event dequeued");
+        playback_queue.clear();
+        audio_player.stop();
+        active_item.reset();
+        continue;
+      }
       const auto preset = preset_store.findById(due->preset_id);
       if (!preset) {
         Serial.printf("[Playback] Missing preset for id %s\n",
@@ -200,6 +207,8 @@ uint32_t tmToEpochSeconds(const tm& tmStruct) {
   tm copy = tmStruct;
 #if defined(_WIN32)
   return static_cast<uint32_t>(_mkgmtime(&copy));
+#elif defined(ESP_PLATFORM)
+  return static_cast<uint32_t>(mktime(&copy));
 #else
   return static_cast<uint32_t>(timegm(&copy));
 #endif
@@ -209,7 +218,7 @@ std::optional<uint32_t> rtcEpochSeconds() {
   if (StickCP2.Rtc.getVoltLow()) {
     return std::nullopt;
   }
-  rtc_datetime_t datetime = StickCP2.Rtc.getDateTime();
+  m5::rtc_datetime_t datetime = StickCP2.Rtc.getDateTime();
   tm tmUtc = datetime.get_tm();
   auto epoch = tmToEpochSeconds(tmUtc);
   if (epoch == 0) {
@@ -325,15 +334,6 @@ void setup() {
   xTaskCreatePinnedToCore(heartbeatTask, "heartbeatTask", 4096, nullptr, 1,
                           &heartbeat_task_handle, 1);
   Serial.println("[Boot] Tasks launched");
-
-  // --- Temporary test: play sample_test preset on boot ---
-  if (auto preset = preset_store.findById("sample_test")) {
-    audio_player.play(*preset);
-    Serial.println("[Boot] sample_test preset auto-play triggered");
-  } else {
-    Serial.println("[Boot] sample_test preset not found.");
-  }
-  // --- End of temporary test code ---
 
   Serial.println("[Boot] setup complete");
 }

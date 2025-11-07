@@ -10,10 +10,11 @@
 
 ## 2. リポジトリ初期化
 1. `acoustics/firmware/` で依存をインストール（`pio pkg install` は初回ビルド時に自動取得される）。
-2. `include/Secrets.example.h` を `include/Secrets.h` にコピーし、以下を設定。
-   - `WIFI_PRIMARY_SSID` / `WIFI_PRIMARY_PASS`
-   - 必要に応じてセカンダリ SSID
-   - `OSC_LISTEN_PORT`, `HEARTBEAT_REMOTE_HOST`, `OSC_AES_KEY`, `OSC_AES_IV`
+2. `acoustics/secrets/osc_config.example.json` を `osc_config.json` にコピーし、以下を設定。  
+   - `wifi.primary` / `wifi.secondary`  
+   - `osc.listen_port`, `osc.key_hex`, `osc.iv_hex`  
+   - `heartbeat.host`, `heartbeat.port`, `ntp.server`, `ntp.offset`, `ntp.interval_ms`  
+   編集後に `python3 acoustics/tools/secrets/gen_headers.py`（または `pio run`）を実行すると `include/Secrets.h` が自動生成される。
 3. `data/manifest.json` にプリセット一覧を記述し、対応する WAV ファイルを `data/presets/` に配置。
 
 ```jsonc
@@ -49,7 +50,7 @@
 
 ## 6. トラブルシュート
 - **書き込み失敗 (`Failed to write to target RAM`)** : CH9102 ドライバ再インストール、USB ケーブル交換、`upload_speed` を `921600` まで下げる。
-- **Wi-Fi 未接続** : Secrets の SSID/Password を確認。職場ネットワークでは MAC フィルタや 5GHz 制限に注意。
+- **Wi-Fi 未接続** : `osc_config.json`（および生成済み `Secrets.h`）の SSID/Password を確認。職場ネットワークでは MAC フィルタや 5GHz 制限に注意。
 - **NTP 同期不可** : ポート 123 のファイアウォール設定を確認。ローカル NTP サーバーを `NtpClient` に設定する。
 - **音が出ない** : `StickCP2.begin()` 時に `config.external_speaker.hat_spk2 = true` を設定したか確認。SPIFFS 上の WAV ファイルパスが `/` から始まっているか、PSRAM 容量に余裕があるかをチェック。
 - **暗号化エラー** : PC 側と AES キー/IV が一致しているか、Timetag 形式 (秒・分解能) が期待通りか確認。

@@ -34,9 +34,11 @@ Welcome! This document walks you through setting up the `acoustics` workspace so
 ## Firmware Workflow
 1. **Create secrets**
    ```sh
-   cp acoustics/firmware/include/Secrets.example.h acoustics/firmware/include/Secrets.h
+   cp acoustics/secrets/osc_config.example.json acoustics/secrets/osc_config.json
+   $EDITOR acoustics/secrets/osc_config.json
    ```
-   Edit `Secrets.h` and set Wi-Fi SSID/password plus OSC keys.
+   Fill in Wi-Fi credentials, OSC AES key/IV, heartbeat target, and NTP settings.  
+   `pio run` automatically converts this JSON into `acoustics/firmware/include/Secrets.h` via `acoustics/tools/secrets/gen_headers.py`, so you never edit the header manually.
 2. **Prepare sound assets**
    - Place WAV files under `acoustics/firmware/data/presets/`.
    - Update `acoustics/firmware/data/manifest.json` with the filenames and gain values.  
@@ -72,12 +74,13 @@ Welcome! This document walks you through setting up the `acoustics` workspace so
    ```sh
    ./build/acoustics/scheduler/agent_a_scheduler \
      acoustics/pc_tools/scheduler/examples/basic_timeline.json \
-     --host 255.255.255.255 --port 9000 --spacing 0.02
+     --host 255.255.255.255 --port 9000 --spacing 0.02 \
+     --osc-config acoustics/secrets/osc_config.json
    ```
    Use `--dry-run` to print bundles without transmitting. Set `--base-time 2024-05-01T21:00:00Z` to schedule relative to a fixed UTC time.
 4. **Run the monitor (example)**
    ```sh
-   ./build/acoustics/monitor/agent_a_monitor --port 9100 --csv logs/heartbeat.csv
+   ./build/acoustics/monitor/agent_a_monitor --port 19100 --csv logs/heartbeat.csv
    ```
    Stop with `Ctrl+C`; a metrics summary prints before the program exits.
 

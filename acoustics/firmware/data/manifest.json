@@ -5,6 +5,108 @@
       "file": "/presets/sample.wav",
       "sample_rate": 44100,
       "gain": 1.0
+    },
+    {
+      "id": "round_ping",
+      "file": "/presets/sample.wav",
+      "sample_rate": 44100,
+      "gain": 0.75
+    },
+    {
+      "id": "frog_voice_a",
+      "file": "/presets/tone_do.wav",
+      "sample_rate": 16000,
+      "gain": 0.82
+    },
+    {
+      "id": "frog_voice_b",
+      "file": "/presets/tone_re.wav",
+      "sample_rate": 16000,
+      "gain": 0.82
+    },
+    {
+      "id": "frog_voice_c",
+      "file": "/presets/tone_mi.wav",
+      "sample_rate": 16000,
+      "gain": 0.82
+    },
+    {
+      "id": "frog_voice_d",
+      "file": "/presets/tone_fa.wav",
+      "sample_rate": 16000,
+      "gain": 0.82
+    },
+    {
+      "id": "A4_mf",
+      "file": "/presets/mother_mf/A4_mf.wav",
+      "sample_rate": 16000,
+      "gain": 1.0
+    },
+    {
+      "id": "Csharp5_mf",
+      "file": "/presets/mother_mf/Csharp5_mf.wav",
+      "sample_rate": 16000,
+      "gain": 1.0
+    },
+    {
+      "id": "E5_mf",
+      "file": "/presets/mother_mf/E5_mf.wav",
+      "sample_rate": 16000,
+      "gain": 1.0
+    },
+    {
+      "id": "Fsharp5_mf",
+      "file": "/presets/mother_mf/Fsharp5_mf.wav",
+      "sample_rate": 16000,
+      "gain": 1.0
+    },
+    {
+      "id": "D5_mf",
+      "file": "/presets/mother_mf/D5_mf.wav",
+      "sample_rate": 16000,
+      "gain": 1.0
+    },
+    {
+      "id": "B4_mf",
+      "file": "/presets/mother_mf/B4_mf.wav",
+      "sample_rate": 16000,
+      "gain": 1.0
+    },
+    {
+      "id": "G4_mf",
+      "file": "/presets/mother_mf/G4_mf.wav",
+      "sample_rate": 16000,
+      "gain": 1.0
+    },
+    {
+      "id": "A2_mf",
+      "file": "/presets/mother_mf/A2_mf.wav",
+      "sample_rate": 16000,
+      "gain": 1.0
+    },
+    {
+      "id": "Csharp3_mf",
+      "file": "/presets/mother_mf/Csharp3_mf.wav",
+      "sample_rate": 16000,
+      "gain": 1.0
+    },
+    {
+      "id": "E3_mf",
+      "file": "/presets/mother_mf/E3_mf.wav",
+      "sample_rate": 16000,
+      "gain": 1.0
+    },
+    {
+      "id": "D3_mf",
+      "file": "/presets/mother_mf/D3_mf.wav",
+      "sample_rate": 16000,
+      "gain": 1.0
+    },
+    {
+      "id": "B2_mf",
+      "file": "/presets/mother_mf/B2_mf.wav",
+      "sample_rate": 16000,
+      "gain": 1.0
     }
   ]
 }

@@ -9,7 +9,7 @@ Utility to generate “missing fundamental” tone presets for the M5StickC Plus
 
 Example:
     python generate_missing_f0.py \\
-        --output-dir ../../firmware/data/presets \\
+        --output-dir ../../sound_assets/f0 \\
         tone_do=392 tone_re=440 tone_mi=494 tone_fa=523.25
 """
 
@@ -22,6 +22,10 @@ from array import array
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List
+
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+DEFAULT_OUTPUT_DIR = SCRIPT_DIR.parent.parent / "sound_assets" / "f0"
 
 
 @dataclass(frozen=True)
@@ -159,8 +163,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("../../firmware/data/presets"),
-        help="Destination directory for WAV files (default: ../../firmware/data/presets).",
+        default=DEFAULT_OUTPUT_DIR,
+        help=f"Destination directory for WAV files (default: {DEFAULT_OUTPUT_DIR}).",
     )
     parser.add_argument(
         "--sample-rate",
@@ -217,9 +221,11 @@ def main() -> None:
         parser.error(str(exc))
         return
 
+    output_dir = args.output_dir.expanduser()
+
     written = generate_tones(
         tones=tone_specs,
-        output_dir=args.output_dir,
+        output_dir=output_dir,
         sample_rate=args.sample_rate,
         duration_sec=args.duration,
         harmonics=args.harmonics,
@@ -233,4 +239,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

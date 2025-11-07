@@ -1,4 +1,5 @@
 add_library(acoustics_scheduler STATIC
+    src/SchedulerController.cpp
     src/SoundTimeline.cpp
     src/TargetResolver.cpp
 )
@@ -35,6 +36,7 @@ endif()
 if (BUILD_TESTING)
     add_executable(acoustics_scheduler_tests
         tests/SoundTimelineTests.cpp
+        tests/OscEncryptorTests.cpp
     )
 
     target_link_libraries(acoustics_scheduler_tests
