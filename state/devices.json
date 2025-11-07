@@ -1,5 +1,17 @@
 [
   {
+    "alias": "dev-004b12c3a838",
+    "fw_version": "0.1.0-dev",
+    "heartbeat": {
+      "count": 4541,
+      "m2": 561418799.2837421,
+      "mean_ms": 579.1535453632566
+    },
+    "id": "dev-004b12c3a838",
+    "last_seen": "2025-11-07T08:17:23Z",
+    "mac": "00:4B:12:C3:A8:38"
+  },
+  {
     "alias": "dev-004b12c3c510",
     "fw_version": "0.1.0-dev",
     "heartbeat": {

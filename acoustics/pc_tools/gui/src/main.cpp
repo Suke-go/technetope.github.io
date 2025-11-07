@@ -13,6 +13,7 @@
 
 #include "json.hpp"
 
+#include <asio.hpp>
 #include <asio/ip/address.hpp>
 
 #include <fmt/format.h>
@@ -20,18 +21,25 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <cstdlib>
+#include <cctype>
 #include <cmath>
 #include <cstring>
 #include <deque>
 #include <filesystem>
 #include <fstream>
+#include <functional>
+#include <mutex>
 #include <optional>
+#include <random>
 #include <set>
 #include <sstream>
 #include <string>
+#include <thread>
 #include <unordered_map>
+#include <limits>
 #include <variant>
 #include <vector>
 
@@ -44,6 +52,7 @@ constexpr std::chrono::milliseconds kRegistryRefreshInterval{500};
 constexpr std::chrono::milliseconds kDiagnosticsRefreshInterval{1500};
 constexpr std::chrono::minutes kSendStatsWindow{60};
 constexpr int kSendStatsBuckets = 12;
+constexpr std::chrono::seconds kMetricsFlushInterval{1};
 constexpr double kLatencyWarningMs = 100.0;
 constexpr double kLatencyCriticalMs = 250.0;
 constexpr double kHeartbeatWarningSeconds = 3.0;
@@ -51,8 +60,194 @@ constexpr double kHeartbeatCriticalSeconds = 10.0;
 constexpr std::size_t kMaxLogEntries = 300;
 const fs::path kDefaultEventLogCsv{"logs/gui_event_log.csv"};
 const fs::path kAuditLogPath{"logs/gui_audit.jsonl"};
+const fs::path kMetricsLogPath{"logs/gui_dashboard_metrics.jsonl"};
 const fs::path kDiagnosticsPath{"state/diagnostics.json"};
 const fs::path kDiagnosticsNotesPath{"state/diagnostics_notes.json"};
+constexpr std::chrono::seconds kMonitorStaleThreshold{5};
+constexpr std::size_t kMonitorHistoryLimit = 64;
+
+std::string formatIso8601(const std::chrono::system_clock::time_point& tp, bool includeDate = true);
+std::string formatTimestamp(const std::chrono::system_clock::time_point& tp);
+std::string base64Encode(const std::uint8_t* data, std::size_t len);
+std::array<std::uint8_t, 20> sha1Digest(const std::uint8_t* data, std::size_t len);
+std::string computeWebSocketAcceptKey(const std::string& clientKey);
+
+class Sha1 {
+public:
+    void update(const std::uint8_t* data, std::size_t len) {
+        bitLength_ += static_cast<std::uint64_t>(len) * 8ULL;
+        while (len > 0) {
+            const std::size_t toCopy = std::min<std::size_t>(64 - bufferSize_, len);
+            std::memcpy(buffer_.data() + bufferSize_, data, toCopy);
+            bufferSize_ += toCopy;
+            data += toCopy;
+            len -= toCopy;
+            if (bufferSize_ == 64) {
+                processBlock(buffer_.data());
+                bufferSize_ = 0;
+            }
+        }
+    }
+
+    std::array<std::uint8_t, 20> finalize() {
+        buffer_[bufferSize_++] = 0x80;
+        if (bufferSize_ > 56) {
+            while (bufferSize_ < 64) {
+                buffer_[bufferSize_++] = 0x00;
+            }
+            processBlock(buffer_.data());
+            bufferSize_ = 0;
+        }
+        while (bufferSize_ < 56) {
+            buffer_[bufferSize_++] = 0x00;
+        }
+        for (int i = 7; i >= 0; --i) {
+            buffer_[bufferSize_++] = static_cast<std::uint8_t>((bitLength_ >> (static_cast<std::uint64_t>(i) * 8ULL)) & 0xFFULL);
+        }
+        processBlock(buffer_.data());
+
+        std::array<std::uint8_t, 20> digest{};
+        for (int i = 0; i < 5; ++i) {
+            digest[i * 4 + 0] = static_cast<std::uint8_t>((state_[i] >> 24) & 0xFF);
+            digest[i * 4 + 1] = static_cast<std::uint8_t>((state_[i] >> 16) & 0xFF);
+            digest[i * 4 + 2] = static_cast<std::uint8_t>((state_[i] >> 8) & 0xFF);
+            digest[i * 4 + 3] = static_cast<std::uint8_t>((state_[i]) & 0xFF);
+        }
+        return digest;
+    }
+
+private:
+    static std::uint32_t leftRotate(std::uint32_t value, std::uint32_t bits) {
+        return (value << bits) | (value >> (32 - bits));
+    }
+
+    void processBlock(const std::uint8_t* block) {
+        std::uint32_t w[80];
+        for (int i = 0; i < 16; ++i) {
+            w[i] = (static_cast<std::uint32_t>(block[i * 4 + 0]) << 24) |
+                   (static_cast<std::uint32_t>(block[i * 4 + 1]) << 16) |
+                   (static_cast<std::uint32_t>(block[i * 4 + 2]) << 8) |
+                   (static_cast<std::uint32_t>(block[i * 4 + 3]));
+        }
+        for (int i = 16; i < 80; ++i) {
+            w[i] = leftRotate(w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16], 1);
+        }
+
+        std::uint32_t a = state_[0];
+        std::uint32_t b = state_[1];
+        std::uint32_t c = state_[2];
+        std::uint32_t d = state_[3];
+        std::uint32_t e = state_[4];
+
+        for (int i = 0; i < 80; ++i) {
+            std::uint32_t f = 0;
+            std::uint32_t k = 0;
+            if (i < 20) {
+                f = (b & c) | ((~b) & d);
+                k = 0x5A827999;
+            } else if (i < 40) {
+                f = b ^ c ^ d;
+                k = 0x6ED9EBA1;
+            } else if (i < 60) {
+                f = (b & c) | (b & d) | (c & d);
+                k = 0x8F1BBCDC;
+            } else {
+                f = b ^ c ^ d;
+                k = 0xCA62C1D6;
+            }
+            std::uint32_t temp = leftRotate(a, 5) + f + e + k + w[i];
+            e = d;
+            d = c;
+            c = leftRotate(b, 30);
+            b = a;
+            a = temp;
+        }
+
+        state_[0] += a;
+        state_[1] += b;
+        state_[2] += c;
+        state_[3] += d;
+        state_[4] += e;
+    }
+
+    std::array<std::uint8_t, 64> buffer_{};
+    std::size_t bufferSize_{0};
+    std::uint64_t bitLength_{0};
+    std::array<std::uint32_t, 5> state_{{
+        0x67452301u,
+        0xEFCDAB89u,
+        0x98BADCFEu,
+        0x10325476u,
+        0xC3D2E1F0u
+    }};
+};
+
+std::array<std::uint8_t, 20> sha1Digest(const std::uint8_t* data, std::size_t len) {
+    Sha1 sha;
+    sha.update(data, len);
+    return sha.finalize();
+}
+
+std::string base64Encode(const std::uint8_t* data, std::size_t len) {
+    static constexpr char kAlphabet[] =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        "abcdefghijklmnopqrstuvwxyz"
+        "0123456789+/";
+    std::string encoded;
+    encoded.reserve(((len + 2) / 3) * 4);
+    std::size_t index = 0;
+    while (index < len) {
+        const std::size_t chunk = std::min<std::size_t>(3, len - index);
+        std::uint32_t octetA = static_cast<std::uint32_t>(data[index++]);
+        std::uint32_t octetB = chunk >= 2 ? static_cast<std::uint32_t>(data[index++]) : 0;
+        std::uint32_t octetC = chunk == 3 ? static_cast<std::uint32_t>(data[index++]) : 0;
+
+        std::uint32_t triple = (octetA << 16) | (octetB << 8) | octetC;
+        encoded.push_back(kAlphabet[(triple >> 18) & 0x3F]);
+        encoded.push_back(kAlphabet[(triple >> 12) & 0x3F]);
+        encoded.push_back(chunk >= 2 ? kAlphabet[(triple >> 6) & 0x3F] : '=');
+        encoded.push_back(chunk == 3 ? kAlphabet[triple & 0x3F] : '=');
+    }
+    return encoded;
+}
+
+std::string computeWebSocketAcceptKey(const std::string& clientKey) {
+    static constexpr char kMagic[] = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+    std::string merged = clientKey + kMagic;
+    auto digest = sha1Digest(reinterpret_cast<const std::uint8_t*>(merged.data()), merged.size());
+    return base64Encode(digest.data(), digest.size());
+}
+
+std::string toLowerCopy(std::string value) {
+    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+    return value;
+}
+
+struct MonitorEventDisplay;
+
+std::string trimString(const std::string& value) {
+    const auto first = value.find_first_not_of(" \t\r\n");
+    if (first == std::string::npos) {
+        return {};
+    }
+    const auto last = value.find_last_not_of(" \t\r\n");
+    return value.substr(first, last - first + 1);
+}
+
+void pushMonitorHistory(std::deque<MonitorEventDisplay>& history,
+                        const std::string& type,
+                        const std::string& summary) {
+    history.push_back(MonitorEventDisplay{
+        std::chrono::system_clock::now(),
+        type,
+        summary
+    });
+    while (history.size() > kMonitorHistoryLimit) {
+        history.pop_front();
+    }
+}
 
 struct EventLogEntry {
     std::chrono::system_clock::time_point timestamp;
@@ -94,7 +289,7 @@ public:
         std::array<int, kSendStatsBuckets> totals{};
         auto now = std::chrono::system_clock::now();
         const auto windowStart = now - kSendStatsWindow;
-        const double bucketDuration = std::chrono::duration<double>(kSendStatsWindow) / static_cast<double>(kSendStatsBuckets);
+        const double bucketDuration = std::chrono::duration<double>(kSendStatsWindow).count() / static_cast<double>(kSendStatsBuckets);
         if (bucketDuration <= 0.0) {
             return ratios;
         }
@@ -132,6 +327,43 @@ private:
     }
 
     mutable std::deque<SendLogSample> samples_;
+};
+
+struct MonitorEvent {
+    std::string type;
+    json payload;
+};
+
+
+class MonitorEventQueue {
+public:
+    void push(MonitorEvent event) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        queue_.push_back(std::move(event));
+    }
+
+    bool pop(MonitorEvent& out) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (queue_.empty()) {
+            return false;
+        }
+        out = std::move(queue_.front());
+        queue_.pop_front();
+        return true;
+    }
+
+private:
+    std::mutex mutex_;
+    std::deque<MonitorEvent> queue_;
+};
+
+struct MonitorConnectionSnapshot {
+    bool connected{false};
+    bool connecting{false};
+    std::string status;
+    int attempt{0};
+    std::chrono::system_clock::time_point lastEventAt{};
+    std::chrono::system_clock::time_point lastStateChange{};
 };
 
 struct DiagnosticsEntry {
@@ -246,6 +478,575 @@ struct SingleShotForm {
     float maxDurationSeconds{5.0f};
     bool armed{false};
     bool dryRun{false};
+};
+
+struct DeviceWsStats {
+    double lastLatencyMs{0.0};
+    std::optional<int> queueDepth;
+    std::optional<bool> isPlaying;
+    std::chrono::system_clock::time_point lastHeartbeatAt{};
+};
+
+struct ParsedWsUrl {
+    std::string host;
+    std::string port;
+    std::string path;
+};
+
+std::optional<ParsedWsUrl> parseWebSocketUrl(const std::string& url) {
+    const std::string prefix = "ws://";
+    if (url.rfind(prefix, 0) != 0) {
+        return std::nullopt;
+    }
+    std::string remainder = url.substr(prefix.size());
+    auto slashPos = remainder.find('/');
+    std::string authority = slashPos == std::string::npos ? remainder : remainder.substr(0, slashPos);
+    std::string path = slashPos == std::string::npos ? "/" : remainder.substr(slashPos);
+    auto colonPos = authority.find(':');
+    std::string host = colonPos == std::string::npos ? authority : authority.substr(0, colonPos);
+    std::string port = colonPos == std::string::npos ? "80" : authority.substr(colonPos + 1);
+    host = trimString(host);
+    port = trimString(port);
+    if (host.empty()) {
+        return std::nullopt;
+    }
+    if (port.empty()) {
+        port = "80";
+    }
+    if (path.empty()) {
+        path = "/";
+    }
+    return ParsedWsUrl{host, port, path};
+}
+
+struct MonitorEventDisplay {
+    std::chrono::system_clock::time_point timestamp{};
+    std::string type;
+    std::string summary;
+};
+
+class MonitorWebSocketClient {
+public:
+    using EventHandler = std::function<void(MonitorEvent&&)>;
+    using StateHandler = std::function<void(const MonitorConnectionSnapshot&)>;
+    using MetricsHandler = std::function<void(double, bool)>;
+
+    MonitorWebSocketClient(EventHandler eventHandler,
+                           StateHandler stateHandler,
+                           MetricsHandler metricsHandler)
+        : eventHandler_(std::move(eventHandler)),
+          stateHandler_(std::move(stateHandler)),
+          metricsHandler_(std::move(metricsHandler)) {}
+
+    ~MonitorWebSocketClient() {
+        stop();
+    }
+
+    void start(const std::string& url) {
+        stop();
+        std::lock_guard<std::mutex> lock(controlMutex_);
+        targetUrl_ = url;
+        shouldStop_.store(false);
+        worker_ = std::thread(&MonitorWebSocketClient::run, this, targetUrl_);
+    }
+
+    void stop() {
+        std::thread localThread;
+        {
+            std::lock_guard<std::mutex> lock(controlMutex_);
+            shouldStop_.store(true);
+            {
+                std::lock_guard<std::mutex> socketLock(socketMutex_);
+                if (activeSocket_) {
+                    asio::error_code ec;
+                    activeSocket_->close(ec);
+                    activeSocket_.reset();
+                }
+            }
+            if (worker_.joinable()) {
+                localThread = std::move(worker_);
+            }
+        }
+        if (localThread.joinable()) {
+            localThread.join();
+        }
+        shouldStop_.store(false);
+        running_.store(false);
+    }
+
+    bool isRunning() const {
+        return running_.load();
+    }
+
+private:
+    void run(std::string url);
+    void publishState(const MonitorConnectionSnapshot& snapshot);
+    bool performHandshake(asio::ip::tcp::socket& socket,
+                          const ParsedWsUrl& parsed,
+                          std::mt19937& rng);
+    bool readTextMessage(asio::ip::tcp::socket& socket,
+                         std::string& message,
+                         std::mt19937& rng);
+    void sendControlFrame(asio::ip::tcp::socket& socket,
+                          std::uint8_t opcode,
+                          const std::vector<std::uint8_t>& payload,
+                          std::mt19937& rng);
+    static std::string readHttpHeaders(asio::ip::tcp::socket& socket);
+    static std::string getHeaderValue(const std::string& headers, const std::string& key);
+
+    EventHandler eventHandler_;
+    StateHandler stateHandler_;
+    MetricsHandler metricsHandler_;
+    std::thread worker_;
+    std::atomic<bool> shouldStop_{false};
+    std::atomic<bool> running_{false};
+    std::mutex socketMutex_;
+    std::shared_ptr<asio::ip::tcp::socket> activeSocket_;
+    std::mutex controlMutex_;
+    std::string targetUrl_;
+};
+
+void MonitorWebSocketClient::publishState(const MonitorConnectionSnapshot& snapshot) {
+    if (stateHandler_) {
+        stateHandler_(snapshot);
+    }
+}
+
+std::string MonitorWebSocketClient::readHttpHeaders(asio::ip::tcp::socket& socket) {
+    std::string headers;
+    headers.reserve(1024);
+    char ch = 0;
+    while (true) {
+        asio::error_code ec;
+        asio::read(socket, asio::buffer(&ch, 1), ec);
+        if (ec) {
+            throw std::runtime_error(fmt::format("WebSocket header read error: {}", ec.message()));
+        }
+        headers.push_back(ch);
+        if (headers.size() >= 4 &&
+            headers.compare(headers.size() - 4, 4, "\r\n\r\n") == 0) {
+            break;
+        }
+        if (headers.size() > 16 * 1024) {
+            throw std::runtime_error("WebSocket header too large");
+        }
+    }
+    return headers;
+}
+
+std::string MonitorWebSocketClient::getHeaderValue(const std::string& headers, const std::string& key) {
+    std::istringstream stream(headers);
+    std::string line;
+    const std::string target = toLowerCopy(key);
+    while (std::getline(stream, line)) {
+        auto colon = line.find(':');
+        if (colon == std::string::npos) {
+            continue;
+        }
+        auto name = trimString(line.substr(0, colon));
+        if (toLowerCopy(name) == target) {
+            return trimString(line.substr(colon + 1));
+        }
+    }
+    return {};
+}
+
+bool MonitorWebSocketClient::performHandshake(asio::ip::tcp::socket& socket,
+                                              const ParsedWsUrl& parsed,
+                                              std::mt19937& rng) {
+    std::array<std::uint8_t, 16> nonce{};
+    std::uniform_int_distribution<int> dist(0, 255);
+    for (auto& byte : nonce) {
+        byte = static_cast<std::uint8_t>(dist(rng));
+    }
+    std::string clientKey = base64Encode(nonce.data(), nonce.size());
+
+    std::ostringstream request;
+    request << "GET " << parsed.path << " HTTP/1.1\r\n"
+            << "Host: " << parsed.host << ":" << parsed.port << "\r\n"
+            << "Upgrade: websocket\r\n"
+            << "Connection: Upgrade\r\n"
+            << "Sec-WebSocket-Key: " << clientKey << "\r\n"
+            << "Sec-WebSocket-Version: 13\r\n"
+            << "\r\n";
+    asio::write(socket, asio::buffer(request.str()));
+
+    auto headers = readHttpHeaders(socket);
+    if (!(headers.rfind("HTTP/1.1 101", 0) == 0 || headers.rfind("HTTP/1.0 101", 0) == 0)) {
+        return false;
+    }
+    auto acceptHeader = getHeaderValue(headers, "sec-websocket-accept");
+    auto expected = computeWebSocketAcceptKey(clientKey);
+    return acceptHeader == expected;
+}
+
+void MonitorWebSocketClient::sendControlFrame(asio::ip::tcp::socket& socket,
+                                              std::uint8_t opcode,
+                                              const std::vector<std::uint8_t>& payload,
+                                              std::mt19937& rng) {
+    std::uniform_int_distribution<int> dist(0, 255);
+    std::array<std::uint8_t, 4> mask{};
+    for (auto& byte : mask) {
+        byte = static_cast<std::uint8_t>(dist(rng));
+    }
+    std::vector<std::uint8_t> maskedPayload = payload;
+    for (std::size_t i = 0; i < maskedPayload.size(); ++i) {
+        maskedPayload[i] ^= mask[i % 4];
+    }
+
+    std::vector<std::uint8_t> frame;
+    frame.reserve(2 + (maskedPayload.size() >= 126 ? 8 : 0) + 4 + maskedPayload.size());
+    frame.push_back(static_cast<std::uint8_t>(0x80 | (opcode & 0x0F)));
+
+    const std::size_t payloadLen = maskedPayload.size();
+    if (payloadLen < 126) {
+        frame.push_back(static_cast<std::uint8_t>(0x80 | payloadLen));
+    } else if (payloadLen <= std::numeric_limits<std::uint16_t>::max()) {
+        frame.push_back(0x80 | 126);
+        frame.push_back(static_cast<std::uint8_t>((payloadLen >> 8) & 0xFF));
+        frame.push_back(static_cast<std::uint8_t>(payloadLen & 0xFF));
+    } else {
+        frame.push_back(0x80 | 127);
+        for (int i = 7; i >= 0; --i) {
+            frame.push_back(static_cast<std::uint8_t>((static_cast<std::uint64_t>(payloadLen) >> (i * 8)) & 0xFF));
+        }
+    }
+    frame.insert(frame.end(), mask.begin(), mask.end());
+    frame.insert(frame.end(), maskedPayload.begin(), maskedPayload.end());
+
+    asio::error_code ec;
+    asio::write(socket, asio::buffer(frame), ec);
+}
+
+bool MonitorWebSocketClient::readTextMessage(asio::ip::tcp::socket& socket,
+                                             std::string& message,
+                                             std::mt19937& rng) {
+    std::array<std::uint8_t, 2> header{};
+    asio::error_code ec;
+    asio::read(socket, asio::buffer(header), ec);
+    if (ec) {
+        return false;
+    }
+
+    const bool fin = (header[0] & 0x80u) != 0;
+    const std::uint8_t opcode = header[0] & 0x0Fu;
+    const bool masked = (header[1] & 0x80u) != 0;
+    std::uint64_t payloadLen = header[1] & 0x7Fu;
+
+    if (payloadLen == 126) {
+        std::array<std::uint8_t, 2> extended{};
+        asio::read(socket, asio::buffer(extended), ec);
+        if (ec) {
+            return false;
+        }
+        payloadLen = (static_cast<std::uint64_t>(extended[0]) << 8) | extended[1];
+    } else if (payloadLen == 127) {
+        std::array<std::uint8_t, 8> extended{};
+        asio::read(socket, asio::buffer(extended), ec);
+        if (ec) {
+            return false;
+        }
+        payloadLen = 0;
+        for (int i = 0; i < 8; ++i) {
+            payloadLen = (payloadLen << 8) | extended[i];
+        }
+    }
+
+    if (payloadLen > 4 * 1024 * 1024) {
+        throw std::runtime_error("WebSocket payload too large");
+    }
+
+    std::array<std::uint8_t, 4> mask{};
+    if (masked) {
+        asio::read(socket, asio::buffer(mask), ec);
+        if (ec) {
+            return false;
+        }
+    }
+
+    std::vector<std::uint8_t> payload(payloadLen);
+    if (payloadLen > 0) {
+        asio::read(socket, asio::buffer(payload.data(), payload.size()), ec);
+        if (ec) {
+            return false;
+        }
+    }
+
+    if (masked) {
+        for (std::size_t i = 0; i < payload.size(); ++i) {
+            payload[i] ^= mask[i % 4];
+        }
+    }
+
+    if (opcode == 0x8) {  // close
+        sendControlFrame(socket, 0x8, {}, rng);
+        return false;
+    }
+
+    if (opcode == 0x9) {  // ping
+        sendControlFrame(socket, 0xA, payload, rng);
+        return true;
+    }
+
+    if (opcode == 0xA) {  // pong
+        return true;
+    }
+
+    if (opcode != 0x1 || !fin) {
+        return true;
+    }
+
+    message.assign(payload.begin(), payload.end());
+    return true;
+}
+
+void MonitorWebSocketClient::run(std::string url) {
+    running_.store(true);
+    auto parsed = parseWebSocketUrl(url);
+    if (!parsed) {
+        MonitorConnectionSnapshot snapshot;
+        snapshot.connected = false;
+        snapshot.connecting = false;
+        snapshot.status = "Invalid WebSocket URL";
+        snapshot.lastStateChange = std::chrono::system_clock::now();
+        publishState(snapshot);
+        running_.store(false);
+        return;
+    }
+
+    std::mt19937 rng(std::random_device{}());
+    int attempt = 0;
+    while (!shouldStop_.load()) {
+        ++attempt;
+        MonitorConnectionSnapshot connecting;
+        connecting.connected = false;
+        connecting.connecting = true;
+        connecting.status = fmt::format("Connecting to ws://{}:{}{}", parsed->host, parsed->port, parsed->path);
+        connecting.attempt = attempt;
+        connecting.lastStateChange = std::chrono::system_clock::now();
+        publishState(connecting);
+
+        auto attemptStart = std::chrono::steady_clock::now();
+        bool success = false;
+
+        try {
+            asio::io_context ioContext;
+            asio::ip::tcp::resolver resolver(ioContext);
+            auto endpoints = resolver.resolve(parsed->host, parsed->port);
+            auto socket = std::make_shared<asio::ip::tcp::socket>(ioContext);
+            {
+                std::lock_guard<std::mutex> lock(socketMutex_);
+                activeSocket_ = socket;
+            }
+            asio::connect(*socket, endpoints);
+            if (!performHandshake(*socket, *parsed, rng)) {
+                throw std::runtime_error("WebSocket handshake failed");
+            }
+            success = true;
+
+            MonitorConnectionSnapshot connected;
+            connected.connected = true;
+            connected.connecting = false;
+            connected.status = "Connected";
+            connected.attempt = attempt;
+            connected.lastStateChange = std::chrono::system_clock::now();
+            publishState(connected);
+
+            std::string message;
+            while (!shouldStop_.load()) {
+                if (!readTextMessage(*socket, message, rng)) {
+                    break;
+                }
+                if (!eventHandler_) {
+                    continue;
+                }
+                try {
+                    json parsedJson = json::parse(message);
+                    MonitorEvent event;
+                    if (parsedJson.contains("type") && parsedJson["type"].is_string()) {
+                        event.type = parsedJson["type"].get<std::string>();
+                        parsedJson.erase("type");
+                    } else {
+                        event.type = "raw";
+                    }
+                    event.payload = std::move(parsedJson);
+                    eventHandler_(std::move(event));
+                } catch (const std::exception& ex) {
+                    spdlog::warn("Monitor WS JSON parse error: {}", ex.what());
+                }
+            }
+        } catch (const std::exception& ex) {
+            MonitorConnectionSnapshot error;
+            error.connected = false;
+            error.connecting = false;
+            error.status = fmt::format("Error: {}", ex.what());
+            error.attempt = attempt;
+            error.lastStateChange = std::chrono::system_clock::now();
+            publishState(error);
+        }
+
+        double durationMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - attemptStart).count();
+        if (metricsHandler_) {
+            metricsHandler_(durationMs, success);
+        }
+
+        {
+            std::lock_guard<std::mutex> lock(socketMutex_);
+            if (activeSocket_) {
+                asio::error_code ec;
+                activeSocket_->close(ec);
+                activeSocket_.reset();
+            }
+        }
+
+        if (shouldStop_.load()) {
+            break;
+        }
+
+        auto backoffSeconds = std::min<std::chrono::seconds>(
+            std::chrono::seconds(1 << std::min(attempt, 3)),
+            std::chrono::seconds(8));
+        std::this_thread::sleep_for(backoffSeconds);
+    }
+
+    running_.store(false);
+    MonitorConnectionSnapshot finalState;
+    finalState.connected = false;
+    finalState.connecting = false;
+    finalState.status = shouldStop_.load() ? "Stopped" : "Idle";
+    finalState.lastStateChange = std::chrono::system_clock::now();
+    publishState(finalState);
+}
+
+class MetricsLogger {
+public:
+    explicit MetricsLogger(fs::path path)
+        : path_(std::move(path)),
+          lastFlush_(std::chrono::steady_clock::now()) {
+        if (path_.has_parent_path()) {
+            fs::create_directories(path_.parent_path());
+        }
+    }
+
+    void recordFrame(double ms) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        frameSamples_.push_back(ms);
+    }
+
+    void recordTimelineSend(double durationMs, bool success) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        lastTimelineMs_ = durationMs;
+        lastTimelineSuccess_ = success;
+        lastTimelineTimestamp_ = std::chrono::system_clock::now();
+    }
+
+    void recordMonitorReconnect(double durationMs, bool success) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        lastMonitorReconnectMs_ = durationMs;
+        lastMonitorReconnectSuccess_ = success;
+        lastMonitorReconnectTimestamp_ = std::chrono::system_clock::now();
+    }
+
+    void flushIfNeeded() {
+        auto now = std::chrono::steady_clock::now();
+        if (now - lastFlush_ < kMetricsFlushInterval) {
+            return;
+        }
+
+        std::vector<double> frameSamplesCopy;
+        std::optional<double> timelineDuration;
+        bool timelineSuccess = false;
+        std::chrono::system_clock::time_point timelineTimestamp{};
+        std::optional<double> monitorReconnectDuration;
+        bool monitorReconnectSuccess = false;
+        std::chrono::system_clock::time_point monitorReconnectTimestamp{};
+
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            if (frameSamples_.empty() && !lastTimelineMs_ && !lastMonitorReconnectMs_) {
+                return;
+            }
+            lastFlush_ = now;
+            frameSamplesCopy.swap(frameSamples_);
+            if (lastTimelineMs_) {
+                timelineDuration = *lastTimelineMs_;
+                timelineSuccess = lastTimelineSuccess_;
+                timelineTimestamp = lastTimelineTimestamp_;
+                lastTimelineMs_.reset();
+            }
+            if (lastMonitorReconnectMs_) {
+                monitorReconnectDuration = *lastMonitorReconnectMs_;
+                monitorReconnectSuccess = lastMonitorReconnectSuccess_;
+                monitorReconnectTimestamp = lastMonitorReconnectTimestamp_;
+                lastMonitorReconnectMs_.reset();
+            }
+        }
+
+        json entry{
+            {"timestamp", formatIso8601(std::chrono::system_clock::now())}
+        };
+
+        if (!frameSamplesCopy.empty()) {
+            double sum = 0.0;
+            double max = 0.0;
+            std::vector<double> sorted = frameSamplesCopy;
+            std::sort(sorted.begin(), sorted.end());
+            for (double sample : frameSamplesCopy) {
+                sum += sample;
+                if (sample > max) {
+                    max = sample;
+                }
+            }
+            double avg = sum / static_cast<double>(frameSamplesCopy.size());
+            std::size_t idx = sorted.size() - 1;
+            if (sorted.size() > 1) {
+                double rank = 0.95 * static_cast<double>(sorted.size() - 1);
+                idx = static_cast<std::size_t>(std::round(rank));
+            }
+            double p95 = sorted[idx];
+            entry["frame_time"] = {
+                {"count", frameSamplesCopy.size()},
+                {"avg_ms", avg},
+                {"max_ms", max},
+                {"p95_ms", p95}
+            };
+        }
+
+        if (timelineDuration) {
+            entry["timeline_send"] = {
+                {"duration_ms", *timelineDuration},
+                {"success", timelineSuccess},
+                {"recorded_at", formatIso8601(timelineTimestamp)}
+            };
+        }
+
+        if (monitorReconnectDuration) {
+            entry["monitor_reconnect"] = {
+                {"duration_ms", *monitorReconnectDuration},
+                {"success", monitorReconnectSuccess},
+                {"recorded_at", formatIso8601(monitorReconnectTimestamp)}
+            };
+        }
+
+        std::ofstream out(path_, std::ios::app);
+        if (!out) {
+            spdlog::warn("Failed to write metrics log: {}", path_.string());
+            return;
+        }
+        out << entry.dump() << '\n';
+    }
+
+private:
+    fs::path path_;
+    std::vector<double> frameSamples_;
+    std::optional<double> lastTimelineMs_;
+    bool lastTimelineSuccess_{false};
+    std::chrono::system_clock::time_point lastTimelineTimestamp_{};
+    std::optional<double> lastMonitorReconnectMs_;
+    bool lastMonitorReconnectSuccess_{false};
+    std::chrono::system_clock::time_point lastMonitorReconnectTimestamp_{};
+    std::chrono::steady_clock::time_point lastFlush_;
+    std::mutex mutex_;
 };
 
 void trimLog(std::deque<EventLogEntry>& log);
@@ -504,7 +1305,7 @@ std::optional<std::chrono::system_clock::time_point> parseIso8601(const std::str
     return tp;
 }
 
-std::string formatIso8601(const std::chrono::system_clock::time_point& tp, bool includeDate = true) {
+std::string formatIso8601(const std::chrono::system_clock::time_point& tp, bool includeDate) {
     auto tt = std::chrono::system_clock::to_time_t(tp);
     std::tm tm{};
 #if defined(_WIN32)
@@ -652,6 +1453,20 @@ std::string currentOperator() {
     return "operator";
 }
 
+ImVec4 severityColor(const std::string& severity) {
+    std::string lower = severity;
+    std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+    if (lower == "critical" || lower == "high") {
+        return ImVec4(1.0f, 0.35f, 0.35f, 1.0f);
+    }
+    if (lower == "medium" || lower == "warn") {
+        return ImVec4(1.0f, 0.7f, 0.2f, 1.0f);
+    }
+    return ImVec4(0.6f, 0.9f, 0.6f, 1.0f);
+}
+
 void appendAuditRecord(const std::string& action,
                        const std::string& target,
                        const std::string& preset,
@@ -714,15 +1529,19 @@ DispatchOutcome sendTimelineToDevices(const std::vector<DeviceSummary>& devices,
                                       const std::string& baseTimeString,
                                       OscController& osc,
                                       std::deque<EventLogEntry>& log,
-                                      SendStatsTracker& stats) {
+                                      SendStatsTracker& stats,
+                                      MetricsLogger& metrics) {
     DispatchOutcome outcome;
     outcome.detail = "no-op";
+    auto dispatchStart = std::chrono::steady_clock::now();
     if (!fs::exists(timelinePath)) {
         log.emplace_back(EventLogEntry{std::chrono::system_clock::now(), spdlog::level::err,
                                        fmt::format("Timeline file not found: {}", timelinePath.string())});
         trimLog(log);
         stats.record(false, "timeline", "missing file");
         appendAuditRecord("timeline_send", "none", timelinePath.string(), false, "timeline file missing");
+        auto durationMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - dispatchStart).count();
+        metrics.recordTimelineSend(durationMs, false);
         return outcome;
     }
 
@@ -745,6 +1564,8 @@ DispatchOutcome sendTimelineToDevices(const std::vector<DeviceSummary>& devices,
         trimLog(log);
         stats.record(false, "timeline", "no targets");
         appendAuditRecord("timeline_send", "none", timelinePath.filename().string(), false, "no targets selected");
+        auto durationMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - dispatchStart).count();
+        metrics.recordTimelineSend(durationMs, false);
         return outcome;
     }
     outcome.targetCount = targets.size();
@@ -800,6 +1621,8 @@ DispatchOutcome sendTimelineToDevices(const std::vector<DeviceSummary>& devices,
                           false,
                           outcome.detail);
     }
+    auto dispatchDuration = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - dispatchStart).count();
+    metrics.recordTimelineSend(dispatchDuration, outcome.success);
     return outcome;
 }
 
@@ -848,6 +1671,85 @@ bool sendSingleShot(OscController& osc,
     return success;
 }
 
+void handleMonitorEvent(const MonitorEvent& event,
+                        std::unordered_map<std::string, DeviceWsStats>& telemetry,
+                        std::vector<DiagnosticsEntry>& diagnostics,
+                        std::deque<EventLogEntry>& log,
+                        std::deque<MonitorEventDisplay>& history) {
+    const auto now = std::chrono::system_clock::now();
+    if (event.type == "heartbeat") {
+        const std::string deviceId = event.payload.value("device_id", std::string{});
+        if (deviceId.empty()) {
+            return;
+        }
+        auto& stats = telemetry[deviceId];
+        stats.lastLatencyMs = event.payload.value("latency_ms", 0.0);
+        if (event.payload.contains("queue_depth") && event.payload["queue_depth"].is_number_integer()) {
+            stats.queueDepth = event.payload["queue_depth"].get<int>();
+        } else {
+            stats.queueDepth.reset();
+        }
+        if (event.payload.contains("is_playing")) {
+            if (event.payload["is_playing"].is_boolean()) {
+                stats.isPlaying = event.payload["is_playing"].get<bool>();
+            } else if (event.payload["is_playing"].is_number_integer()) {
+                stats.isPlaying = (event.payload["is_playing"].get<int>() != 0);
+            } else {
+                stats.isPlaying.reset();
+            }
+        }
+        stats.lastHeartbeatAt = now;
+        log.emplace_back(EventLogEntry{now,
+                                       spdlog::level::info,
+                                       fmt::format("Heartbeat {} latency={:.1f} ms queue={}",
+                                                   deviceId,
+                                                   stats.lastLatencyMs,
+                                                   stats.queueDepth ? std::to_string(*stats.queueDepth) : "-")});
+        trimLog(log);
+        pushMonitorHistory(history,
+                           "heartbeat",
+                           fmt::format("{} {:.1f} ms", deviceId, stats.lastLatencyMs));
+        return;
+    }
+
+    if (event.type == "diagnostics") {
+        DiagnosticsEntry entry;
+        entry.id = event.payload.value("id", fmt::format("diag-{}", diagnostics.size() + 1));
+        entry.deviceId = event.payload.value("device_id", std::string{});
+        entry.severity = event.payload.value("severity", std::string{"warn"});
+        entry.reason = event.payload.value("reason", std::string{});
+        entry.relatedEventId = event.payload.value("related_event_id", std::string{});
+        entry.recommendedAction = event.payload.value("recommended_action", std::string{});
+        if (event.payload.contains("timestamp") && event.payload["timestamp"].is_string()) {
+            if (auto parsed = parseIso8601(event.payload["timestamp"].get<std::string>())) {
+                entry.timestamp = *parsed;
+            } else {
+                entry.timestamp = now;
+            }
+        } else {
+            entry.timestamp = now;
+        }
+        diagnostics.insert(diagnostics.begin(), entry);
+        if (diagnostics.size() > 200) {
+            diagnostics.pop_back();
+        }
+
+        log.emplace_back(EventLogEntry{now,
+                                       spdlog::level::warn,
+                                       fmt::format("Diagnostics {} severity={} reason={}",
+                                                   entry.deviceId.empty() ? "(unknown)" : entry.deviceId,
+                                                   entry.severity,
+                                                   entry.reason)});
+        trimLog(log);
+        pushMonitorHistory(history,
+                           "diagnostics",
+                           fmt::format("{} {}", entry.deviceId, entry.reason));
+        return;
+    }
+
+    pushMonitorHistory(history, event.type, event.payload.dump());
+}
+
 } // namespace
 
 int main() {
@@ -892,14 +1794,47 @@ int main() {
 
     acoustics::common::DeviceRegistry registry(devicesPath);
     AliasStore aliasStore(aliasPath);
+    DiagnosticsNotesStore diagnosticsNotes(kDiagnosticsNotesPath);
     OscController oscController;
+    MetricsLogger metricsLogger(kMetricsLogPath);
+    MonitorEventQueue monitorEventQueue;
+    std::deque<MonitorEventDisplay> monitorHistory;
+    std::unordered_map<std::string, DeviceWsStats> deviceWsTelemetry;
+    MonitorConnectionSnapshot monitorState{};
+    MonitorConnectionSnapshot previousMonitorState{};
+    std::mutex monitorStateMutex;
+    bool monitorStateDirty = false;
+    std::chrono::system_clock::time_point lastMonitorEventAt{};
 
+    auto monitorStateHandler = [&](const MonitorConnectionSnapshot& snapshot) {
+        std::lock_guard<std::mutex> lock(monitorStateMutex);
+        monitorState = snapshot;
+        monitorStateDirty = true;
+    };
+
+    MonitorWebSocketClient monitorClient(
+        [&](MonitorEvent&& event) {
+            monitorEventQueue.push(std::move(event));
+        },
+        monitorStateHandler,
+        [&](double durationMs, bool success) {
+            metricsLogger.recordMonitorReconnect(durationMs, success);
+        }
+    );
+
+    SendStatsTracker sendStats;
     OscConfig oscConfig{};
     std::optional<std::string> renamingId;
     std::string aliasEditBuffer;
 
     std::set<std::string> selectedDevices;
     std::deque<EventLogEntry> eventLog;
+
+    std::vector<DiagnosticsEntry> diagnostics;
+    std::chrono::steady_clock::time_point lastDiagnosticsRefresh =
+        std::chrono::steady_clock::now() - kDiagnosticsRefreshInterval;
+    std::optional<std::string> editingDiagnosticId;
+    std::string diagnosticNoteDraft;
 
     std::chrono::steady_clock::time_point lastRefresh = std::chrono::steady_clock::now() - kRegistryRefreshInterval;
     std::vector<DeviceSummary> devices;
@@ -912,6 +1847,17 @@ int main() {
     char testPresetBuffer[64] = {0};
     std::strncpy(testPresetBuffer, "test_ping", sizeof(testPresetBuffer) - 1);
     double testLeadSeconds = 0.5;
+    TimelinePreview timelinePreview;
+    timelinePreview.sourcePath = fs::path(timelinePathBuffer);
+    timelinePreview.leadSeconds = leadTimeSeconds;
+    bool timelinePreviewDirty = true;
+    bool timelineArmed = false;
+    bool timelineDryRun = false;
+    SingleShotForm singleShotForm;
+    char monitorUrlBuffer[256];
+    std::strncpy(monitorUrlBuffer, "ws://127.0.0.1:48080/ws/events", sizeof(monitorUrlBuffer) - 1);
+    monitorUrlBuffer[sizeof(monitorUrlBuffer) - 1] = '\0';
+    bool monitorAutoConnect = false;
 
     char hostBuffer[128];
     std::strncpy(hostBuffer, oscConfig.host.c_str(), sizeof(hostBuffer) - 1);
@@ -923,12 +1869,78 @@ int main() {
     bool dockspaceBuilt = false;
 
     while (!glfwWindowShouldClose(window)) {
+        auto frameStart = std::chrono::steady_clock::now();
         glfwPollEvents();
 
         auto now = std::chrono::steady_clock::now();
         auto refreshed = buildDeviceSummaries(registry, aliasStore, lastRefresh, now);
         if (!refreshed.empty()) {
             devices = std::move(refreshed);
+        }
+        if (now - lastDiagnosticsRefresh >= kDiagnosticsRefreshInterval) {
+            diagnostics = loadDiagnosticsEntries(kDiagnosticsPath);
+            lastDiagnosticsRefresh = now;
+        }
+        if (timelinePreviewDirty) {
+            timelinePreview.sourcePath = fs::path(timelinePathBuffer);
+            auto baseTime = std::chrono::system_clock::now();
+            if (!baseTimeNow) {
+                if (auto parsed = parseIso8601(baseTimeBuffer)) {
+                    baseTime = *parsed;
+                }
+            }
+            timelinePreview.baseTime = baseTime;
+            timelinePreview.leadSeconds = leadTimeSeconds;
+            if (auto loaded = tryLoadTimeline(timelinePreview.sourcePath, timelinePreview.lastError)) {
+                timelinePreview.timeline = std::move(*loaded);
+            } else {
+                timelinePreview.timeline.reset();
+            }
+            timelinePreviewDirty = false;
+        }
+
+        MonitorEvent monitorEvent;
+        while (monitorEventQueue.pop(monitorEvent)) {
+            handleMonitorEvent(monitorEvent,
+                               deviceWsTelemetry,
+                               diagnostics,
+                               eventLog,
+                               monitorHistory);
+            lastMonitorEventAt = std::chrono::system_clock::now();
+        }
+
+        MonitorConnectionSnapshot currentMonitorState;
+        {
+            std::lock_guard<std::mutex> lock(monitorStateMutex);
+            currentMonitorState = monitorState;
+        }
+        if (currentMonitorState.connected != previousMonitorState.connected ||
+            currentMonitorState.connecting != previousMonitorState.connecting ||
+            currentMonitorState.status != previousMonitorState.status) {
+            if (!currentMonitorState.status.empty()) {
+                eventLog.emplace_back(EventLogEntry{
+                    std::chrono::system_clock::now(),
+                    spdlog::level::info,
+                    fmt::format("Monitor WS: {}", currentMonitorState.status)
+                });
+                trimLog(eventLog);
+            }
+            previousMonitorState = currentMonitorState;
+        }
+
+        const bool hasMonitorEvent = lastMonitorEventAt.time_since_epoch().count() > 0;
+        const bool monitorLinkStale = currentMonitorState.connected &&
+                                      hasMonitorEvent &&
+                                      (std::chrono::system_clock::now() - lastMonitorEventAt > kMonitorStaleThreshold);
+        std::string monitorStatusLabel;
+        if (!currentMonitorState.status.empty()) {
+            monitorStatusLabel = currentMonitorState.status;
+        } else if (currentMonitorState.connected) {
+            monitorStatusLabel = "Connected";
+        } else if (currentMonitorState.connecting) {
+            monitorStatusLabel = "Connecting";
+        } else {
+            monitorStatusLabel = "Idle";
         }
 
         ImGui_ImplOpenGL3_NewFrame();
@@ -947,12 +1959,352 @@ int main() {
             ImGuiID dockBottom = ImGui::DockBuilderSplitNode(dockMain, ImGuiDir_Down, 0.25f, nullptr, &dockMain);
 
             ImGui::DockBuilderDockWindow("Dispatch", dockRight);
+            ImGui::DockBuilderDockWindow("Timeline Preview", dockRight);
+            ImGui::DockBuilderDockWindow("Monitor Link", dockRight);
+            ImGui::DockBuilderDockWindow("Single Shot Console", dockRight);
             ImGui::DockBuilderDockWindow("OSC Endpoint", dockRight);
             ImGui::DockBuilderDockWindow("Event Log", dockBottom);
+            ImGui::DockBuilderDockWindow("Diagnostics Center", dockBottom);
             ImGui::DockBuilderDockWindow("Status", dockBottom);
+            ImGui::DockBuilderDockWindow("Top Bar", dockMain);
             ImGui::DockBuilderDockWindow("Devices", dockMain);
             ImGui::DockBuilderFinish(dockspaceId);
         }
+
+        const auto nowUtc = std::chrono::system_clock::now();
+        const auto nowJst = nowUtc + std::chrono::hours(9);
+        const bool monitorReady = fs::exists(devicesPath) && !devices.empty();
+        const bool schedulerReady = fs::exists("acoustics/pc_tools/scheduler/src/main.cpp");
+        const bool secretsReady = fs::exists("acoustics/firmware/include/Secrets.h");
+
+        if (ImGui::Begin("Top Bar", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize)) {
+            ImGui::Text("UTC %s", formatIso8601(nowUtc, false).c_str());
+            ImGui::SameLine();
+            ImGui::Text("JST %s", formatIso8601(nowJst, false).c_str());
+
+            auto drawStatus = [](const char* label, bool ok) {
+                ImGui::TextUnformatted(label);
+                ImGui::SameLine();
+                ImGui::TextColored(ok ? ImVec4(0.5f, 1.0f, 0.5f, 1.0f) : ImVec4(1.0f, 0.4f, 0.4f, 1.0f),
+                                   ok ? "OK" : "NG");
+            };
+            drawStatus("Scheduler", schedulerReady);
+            ImGui::SameLine();
+            drawStatus("Monitor", monitorReady);
+            ImGui::SameLine();
+            drawStatus("Secrets", secretsReady);
+
+            auto [ok, ng] = sendStats.lastHourCounts();
+            ImGui::Text("Send stats (60m): success=%d fail=%d", ok, ng);
+            auto ratios = sendStats.bucketizedSuccessRates();
+            ImGui::PlotLines("##send_spark",
+                             ratios.data(),
+                             static_cast<int>(ratios.size()),
+                             0,
+                             "success ratio",
+                             0.0f,
+                             1.0f,
+                             ImVec2(300.0f, 60.0f));
+            ImGui::Separator();
+            ImGui::Text("Monitor WS: %s", monitorStatusLabel.c_str());
+            if (monitorLinkStale) {
+                ImGui::SameLine();
+                ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "STALE");
+            }
+            if (hasMonitorEvent) {
+                double secondsSince = std::chrono::duration<double>(std::chrono::system_clock::now() - lastMonitorEventAt).count();
+                ImGui::Text("Last event: %.1f s ago", secondsSince);
+            } else {
+                ImGui::TextDisabled("No monitor events yet");
+            }
+        }
+        ImGui::End();
+
+        if (ImGui::Begin("Timeline Preview")) {
+            ImGui::Text("Source: %s", timelinePreview.sourcePath.string().c_str());
+            ImGui::SameLine();
+            if (ImGui::SmallButton("Refresh")) {
+                timelinePreviewDirty = true;
+            }
+            ImGui::Text("Base UTC: %s", formatIso8601(timelinePreview.baseTime).c_str());
+            ImGui::Text("Lead seconds: %.2f", timelinePreview.leadSeconds);
+            if (!timelinePreview.ready()) {
+                if (!timelinePreview.lastError.empty()) {
+                    ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Preview error: %s", timelinePreview.lastError.c_str());
+                } else {
+                    ImGui::TextDisabled("Load a timeline file to preview.");
+                }
+            } else {
+                const auto& events = timelinePreview.timeline->events();
+                if (ImGui::BeginTable("timeline_events", 5, ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_Borders)) {
+                    ImGui::TableSetupScrollFreeze(0, 1);
+                    ImGui::TableSetupColumn("Scheduled (UTC)");
+                    ImGui::TableSetupColumn("Remaining (s)");
+                    ImGui::TableSetupColumn("Targets");
+                    ImGui::TableSetupColumn("Preset");
+                    ImGui::TableSetupColumn("Offset (s)");
+                    ImGui::TableHeadersRow();
+                    for (std::size_t i = 0; i < events.size(); ++i) {
+                        const auto& evt = events[i];
+                        auto scheduled = timelinePreview.baseTime + std::chrono::duration_cast<std::chrono::system_clock::duration>(
+                            std::chrono::duration<double>(evt.offsetSeconds));
+                        const double remaining = std::chrono::duration<double>(scheduled - nowUtc).count();
+                        ImGui::TableNextRow();
+                        ImGui::TableSetColumnIndex(0);
+                        ImGui::Text("%s", formatIso8601(scheduled).c_str());
+                        ImGui::TableSetColumnIndex(1);
+                        ImGui::Text("%.1f", remaining);
+                        ImGui::TableSetColumnIndex(2);
+                        ImGui::TextWrapped("%s", describeTargets(evt.targets).c_str());
+                        ImGui::TableSetColumnIndex(3);
+                        ImGui::TextUnformatted(extractPreset(evt).c_str());
+                        ImGui::TableSetColumnIndex(4);
+                        ImGui::Text("%.2f", evt.offsetSeconds);
+                    }
+                    ImGui::EndTable();
+                }
+
+                if (!events.empty()) {
+                    std::vector<double> offsets;
+                    std::vector<double> lanes;
+                    offsets.reserve(events.size());
+                    lanes.reserve(events.size());
+                    for (std::size_t i = 0; i < events.size(); ++i) {
+                        offsets.push_back(events[i].offsetSeconds);
+                        lanes.push_back(static_cast<double>(events.size() - i));
+                    }
+                    if (ImPlot::BeginPlot("Offsets", ImVec2(-1, 180), ImPlotFlags_NoLegend | ImPlotFlags_NoTitle)) {
+                        ImPlot::SetupAxes("Offset (s)", "Event", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_NoDecorations | ImPlotAxisFlags_AutoFit);
+                        ImPlot::PlotScatter("events", offsets.data(), lanes.data(), static_cast<int>(offsets.size()));
+                        ImPlot::EndPlot();
+                    }
+                }
+            }
+        }
+        ImGui::End();
+
+        if (ImGui::Begin("Monitor Link")) {
+            ImGui::InputText("WebSocket URL", monitorUrlBuffer, IM_ARRAYSIZE(monitorUrlBuffer));
+            bool connectClicked = ImGui::Button("Connect");
+            ImGui::SameLine();
+            bool disconnectClicked = ImGui::Button("Disconnect");
+            ImGui::SameLine();
+            bool autoChanged = ImGui::Checkbox("Auto-connect", &monitorAutoConnect);
+
+            if (connectClicked) {
+                monitorAutoConnect = true;
+                monitorClient.start(monitorUrlBuffer);
+            }
+            if (disconnectClicked) {
+                monitorAutoConnect = false;
+                monitorClient.stop();
+            }
+            if (autoChanged) {
+                if (monitorAutoConnect && !monitorClient.isRunning()) {
+                    monitorClient.start(monitorUrlBuffer);
+                } else if (!monitorAutoConnect) {
+                    monitorClient.stop();
+                }
+            }
+
+            ImGui::Separator();
+            ImGui::Text("Status: %s", monitorStatusLabel.c_str());
+            if (currentMonitorState.attempt > 0) {
+                ImGui::Text("Attempts: %d", currentMonitorState.attempt);
+            }
+            if (monitorLinkStale) {
+                ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f),
+                                   "STALE (>%lld s without events)",
+                                   static_cast<long long>(kMonitorStaleThreshold.count()));
+            }
+            if (currentMonitorState.connected && hasMonitorEvent) {
+                double secondsSince = std::chrono::duration<double>(std::chrono::system_clock::now() - lastMonitorEventAt).count();
+                ImGui::Text("Last event %.1f s ago", secondsSince);
+            } else if (!hasMonitorEvent) {
+                ImGui::TextDisabled("No events yet");
+            }
+
+            if (ImGui::Button("Inject Sample Heartbeat")) {
+                MonitorEvent sample;
+                sample.type = "heartbeat";
+                const std::string deviceId = devices.empty() ? std::string("device-sim") : devices.front().snapshot.state.id;
+                sample.payload = {
+                    {"device_id", deviceId},
+                    {"latency_ms", 42.0},
+                    {"queue_depth", 0},
+                    {"is_playing", false}
+                };
+                monitorEventQueue.push(std::move(sample));
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Inject Diagnostics")) {
+                MonitorEvent diag;
+                diag.type = "diagnostics";
+                diag.payload = {
+                    {"device_id", devices.empty() ? "device-sim" : devices.front().snapshot.state.id},
+                    {"severity", "warn"},
+                    {"reason", "Mock high latency"},
+                    {"recommended_action", "Check Wi-Fi link"}
+                };
+                monitorEventQueue.push(std::move(diag));
+            }
+
+            ImGui::Separator();
+            if (ImGui::BeginTable("monitor_history_table", 3, ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersOuter)) {
+                ImGui::TableSetupScrollFreeze(0, 1);
+                ImGui::TableSetupColumn("Time");
+                ImGui::TableSetupColumn("Type");
+                ImGui::TableSetupColumn("Summary");
+                ImGui::TableHeadersRow();
+                for (auto it = monitorHistory.rbegin(); it != monitorHistory.rend(); ++it) {
+                    ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0);
+                    ImGui::Text("%s", formatTimestamp(it->timestamp).c_str());
+                    ImGui::TableSetColumnIndex(1);
+                    ImGui::Text("%s", it->type.c_str());
+                    ImGui::TableSetColumnIndex(2);
+                    ImGui::TextWrapped("%s", it->summary.c_str());
+                }
+                ImGui::EndTable();
+            } else {
+                ImGui::TextDisabled("No history yet");
+            }
+        }
+        ImGui::End();
+
+        if (ImGui::Begin("Single Shot Console")) {
+            std::vector<const DeviceSummary*> deviceRefs;
+            deviceRefs.reserve(devices.size());
+            for (const auto& dev : devices) {
+                deviceRefs.push_back(&dev);
+            }
+            if (singleShotForm.selectedDeviceIndex >= static_cast<int>(deviceRefs.size())) {
+                singleShotForm.selectedDeviceIndex = static_cast<int>(deviceRefs.size()) - 1;
+            }
+            std::string targetLabel = "(select)";
+            if (singleShotForm.selectedDeviceIndex >= 0 &&
+                singleShotForm.selectedDeviceIndex < static_cast<int>(deviceRefs.size())) {
+                const auto& dev = *deviceRefs[singleShotForm.selectedDeviceIndex];
+                targetLabel = fmt::format("{} ({})", displayAlias(dev), dev.snapshot.state.id);
+            }
+            if (ImGui::BeginCombo("Target", targetLabel.c_str())) {
+                for (int idx = 0; idx < static_cast<int>(deviceRefs.size()); ++idx) {
+                    const auto& dev = *deviceRefs[idx];
+                    auto label = fmt::format("{} ({})", displayAlias(dev), dev.snapshot.state.id);
+                    bool selected = idx == singleShotForm.selectedDeviceIndex;
+                    if (ImGui::Selectable(label.c_str(), selected)) {
+                        singleShotForm.selectedDeviceIndex = idx;
+                    }
+                    if (selected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            if (ImGui::SmallButton("Adopt from selection")) {
+                if (!selectedDevices.empty()) {
+                    const auto& targetId = *selectedDevices.begin();
+                    for (int idx = 0; idx < static_cast<int>(deviceRefs.size()); ++idx) {
+                        if (deviceRefs[idx]->snapshot.state.id == targetId) {
+                            singleShotForm.selectedDeviceIndex = idx;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            ImGui::InputText("Preset", &singleShotForm.preset);
+            ImGui::SliderFloat("Lead (s)", &singleShotForm.leadSeconds, 0.0f, 5.0f);
+            ImGui::SliderFloat("Gain (dB)", &singleShotForm.gainDb, -24.0f, 6.0f);
+            ImGui::Checkbox("Limit duration", &singleShotForm.limitDuration);
+            if (singleShotForm.limitDuration) {
+                ImGui::SliderFloat("Max duration (s)", &singleShotForm.maxDurationSeconds, 0.1f, 30.0f);
+            }
+            ImGui::Checkbox("Dry run", &singleShotForm.dryRun);
+            ImGui::Checkbox("Arm single shot", &singleShotForm.armed);
+            const bool shotReady = singleShotForm.armed &&
+                                   singleShotForm.selectedDeviceIndex >= 0 &&
+                                   singleShotForm.selectedDeviceIndex < static_cast<int>(deviceRefs.size());
+            ImGui::BeginDisabled(!shotReady);
+            if (ImGui::Button("Fire")) {
+                const auto& targetDev = *deviceRefs[singleShotForm.selectedDeviceIndex];
+                sendSingleShot(oscController, targetDev, singleShotForm, eventLog, sendStats);
+                singleShotForm.armed = false;
+            }
+            ImGui::EndDisabled();
+        }
+        ImGui::End();
+
+        if (ImGui::Begin("Diagnostics Center")) {
+            ImGui::Text("Entries: %zu", diagnostics.size());
+            ImGui::SameLine();
+            if (ImGui::SmallButton("Force Refresh")) {
+                diagnostics = loadDiagnosticsEntries(kDiagnosticsPath);
+                lastDiagnosticsRefresh = std::chrono::steady_clock::now();
+            }
+            ImGui::Text("Notes: %s", diagnosticsNotes.path().string().c_str());
+            ImGui::Separator();
+            ImGui::BeginChild("DiagnosticsList", ImVec2(0, 0), false, ImGuiWindowFlags_HorizontalScrollbar);
+            for (const auto& diag : diagnostics) {
+                ImGui::PushID(diag.id.c_str());
+                ImGui::TextColored(severityColor(diag.severity), "%s", diag.severity.empty() ? "unknown" : diag.severity.c_str());
+                ImGui::SameLine();
+                ImGui::Text("%s", formatIso8601(diag.timestamp).c_str());
+                if (!diag.deviceId.empty()) {
+                    ImGui::Text("Device: %s", diag.deviceId.c_str());
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton("Focus##diagfocus")) {
+                        selectedDevices.clear();
+                        selectedDevices.insert(diag.deviceId);
+                    }
+                }
+                if (!diag.reason.empty()) {
+                    ImGui::TextWrapped("%s", diag.reason.c_str());
+                }
+                if (!diag.recommendedAction.empty()) {
+                    ImGui::Text("Action: %s", diag.recommendedAction.c_str());
+                }
+                if (!diag.relatedEventId.empty()) {
+                    ImGui::TextDisabled("Related: %s", diag.relatedEventId.c_str());
+                }
+
+                std::string note = diagnosticsNotes.noteFor(diag.id);
+                if (editingDiagnosticId && *editingDiagnosticId == diag.id) {
+                    ImGui::InputTextMultiline("Note", &diagnosticNoteDraft, ImVec2(-1, 80.0f));
+                    if (ImGui::Button("Save Note")) {
+                        diagnosticsNotes.setNote(diag.id, diagnosticNoteDraft);
+                        eventLog.emplace_back(EventLogEntry{std::chrono::system_clock::now(), spdlog::level::info,
+                                                            fmt::format("Diagnostics note updated (%s)", diag.id)});
+                        trimLog(eventLog);
+                        appendAuditRecord("diagnostic_note",
+                                          diag.deviceId,
+                                          diag.id,
+                                          true,
+                                          "Note updated");
+                        editingDiagnosticId.reset();
+                        diagnosticNoteDraft.clear();
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Cancel##note")) {
+                        editingDiagnosticId.reset();
+                    }
+                } else {
+                    if (note.empty()) {
+                        ImGui::TextDisabled("Note: (none)");
+                    } else {
+                        ImGui::TextWrapped("Note: %s", note.c_str());
+                    }
+                    if (ImGui::SmallButton("Edit Note")) {
+                        editingDiagnosticId = diag.id;
+                        diagnosticNoteDraft = note;
+                    }
+                }
+                ImGui::Separator();
+                ImGui::PopID();
+            }
+            ImGui::EndChild();
+        }
+        ImGui::End();
 
         if (ImGui::Begin("OSC Endpoint")) {
             ImGui::InputText("Host", hostBuffer, IM_ARRAYSIZE(hostBuffer));
@@ -971,6 +2323,7 @@ int main() {
             const int tilesPerColumn = 20;
             int tileIndex = 0;
             ImGui::BeginChild("DeviceGrid", ImVec2(0, 0), false, ImGuiWindowFlags_HorizontalScrollbar);
+            const auto nowSystem = std::chrono::system_clock::now();
             for (auto& dev : devices) {
                 if (tileIndex % tilesPerColumn == 0) {
                     if (tileIndex != 0) {
@@ -1019,9 +2372,25 @@ int main() {
 
             ImGui::Text("Latency: %.1f ms (std %.1f)", dev.meanLatency, dev.stdLatency);
             ImGui::Text("Heartbeat: %.1f s ago", dev.secondsSinceSeen);
+            if (auto it = deviceWsTelemetry.find(dev.snapshot.state.id); it != deviceWsTelemetry.end()) {
+                const bool wsStale = nowSystem - it->second.lastHeartbeatAt > kMonitorStaleThreshold;
+                ImVec4 wsColor = wsStale ? ImVec4(1.0f, 0.5f, 0.5f, 1.0f) : ImVec4(0.6f, 0.9f, 0.6f, 1.0f);
+                ImGui::TextColored(wsColor,
+                                   "WS %.1f ms @ %s",
+                                   it->second.lastLatencyMs,
+                                   formatTimestamp(it->second.lastHeartbeatAt).c_str());
+                if (it->second.queueDepth) {
+                    ImGui::SameLine();
+                    ImGui::Text("Queue=%d", *it->second.queueDepth);
+                }
+                if (it->second.isPlaying) {
+                    ImGui::SameLine();
+                    ImGui::Text("%s", *it->second.isPlaying ? "Playing" : "Idle");
+                }
+            }
 
             if (ImGui::Button("Test Signal")) {
-                sendTestSignal(oscController, testPresetBuffer, dev, testLeadSeconds, eventLog);
+                sendTestSignal(oscController, testPresetBuffer, dev, testLeadSeconds, eventLog, sendStats);
             }
             ImGui::SameLine();
             if (ImGui::Button("Focus")) {
@@ -1058,23 +2427,68 @@ int main() {
             }
 
             ImGui::Separator();
-
-            ImGui::InputText("Timeline", timelinePathBuffer, IM_ARRAYSIZE(timelinePathBuffer));
-            ImGui::Checkbox("Use current time", &baseTimeNow);
+            bool timelineInputChanged = false;
+            if (ImGui::InputText("Timeline", timelinePathBuffer, IM_ARRAYSIZE(timelinePathBuffer))) {
+                timelineInputChanged = true;
+            }
+            if (ImGui::Checkbox("Use current time", &baseTimeNow)) {
+                timelineInputChanged = true;
+            }
             if (!baseTimeNow) {
-                ImGui::InputText("Base time (ISO)", baseTimeBuffer, IM_ARRAYSIZE(baseTimeBuffer));
+                if (ImGui::InputText("Base time (ISO)", baseTimeBuffer, IM_ARRAYSIZE(baseTimeBuffer))) {
+                    timelineInputChanged = true;
+                }
             }
-            ImGui::SliderFloat("Lead time (s)", reinterpret_cast<float*>(&leadTimeSeconds), 0.0f, 5.0f);
+            if (ImGui::SliderFloat("Lead time (s)", reinterpret_cast<float*>(&leadTimeSeconds), 0.0f, 5.0f)) {
+                timelineInputChanged = true;
+            }
+            if (timelineInputChanged) {
+                timelinePreviewDirty = true;
+            }
+
+            if (!timelinePreview.lastError.empty()) {
+                ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Preview error: %s", timelinePreview.lastError.c_str());
+            } else if (!timelinePreview.ready()) {
+                ImGui::TextDisabled("Preview not available yet.");
+            } else {
+                ImGui::Text("Preview events: %zu | Lead=%.2f s", timelinePreview.timeline->events().size(), timelinePreview.leadSeconds);
+            }
+
+            ImGui::Checkbox("Dry run only", &timelineDryRun);
+            ImGui::Checkbox("Arm timeline send", &timelineArmed);
+            ImGui::BeginDisabled(!timelineArmed);
             if (ImGui::Button("Send Timeline")) {
-                sendTimelineToDevices(devices,
-                                      selectedDevices,
-                                      fs::path(timelinePathBuffer),
-                                      leadTimeSeconds,
-                                      baseTimeNow,
-                                      baseTimeBuffer,
-                                      oscController,
-                                      eventLog);
+                std::size_t targetCount = selectedDevices.empty() ? devices.size() : selectedDevices.size();
+                const auto timelineName = fs::path(timelinePathBuffer).filename().string();
+                if (timelineDryRun) {
+                    const std::size_t eventCount = timelinePreview.ready() ? timelinePreview.timeline->events().size() : 0;
+                    auto detail = fmt::format("Dry-run timeline '%s' (targets=%zu events=%zu)", timelineName, targetCount, eventCount);
+                    eventLog.emplace_back(EventLogEntry{std::chrono::system_clock::now(), spdlog::level::info, detail});
+                    trimLog(eventLog);
+                    sendStats.record(true, fmt::format("timeline:dryrun:%s", timelineName), detail);
+                    appendAuditRecord("timeline_dry_run",
+                                      fmt::format("%zu target(s)", targetCount),
+                                      timelineName,
+                                      true,
+                                      detail);
+                } else {
+                    auto outcome = sendTimelineToDevices(devices,
+                                                         selectedDevices,
+                                                         fs::path(timelinePathBuffer),
+                                                         leadTimeSeconds,
+                                                         baseTimeNow,
+                                                         baseTimeBuffer,
+                                                         oscController,
+                                                         eventLog,
+                                                         sendStats,
+                                                         metricsLogger);
+                    (void)outcome;
+                }
+                timelineArmed = false;
+                timelineDryRun = false;
+                timelinePreviewDirty = true;
             }
+            ImGui::EndDisabled();
 
             ImGui::Separator();
             ImGui::InputText("Test preset", testPresetBuffer, IM_ARRAYSIZE(testPresetBuffer));
@@ -1129,6 +2543,9 @@ int main() {
             ImGui::Text("Alias store: %s", aliasStore.path().string().c_str());
             ImGui::Text("OSC: %s:%d (broadcast=%s)", oscConfig.host.c_str(), oscConfig.port, oscConfig.broadcast ? "true" : "false");
             ImGui::Text("Selected: %zu", selectedDevices.size());
+            ImGui::Text("Audit log: %s", kAuditLogPath.string().c_str());
+            ImGui::Text("Diag notes: %s", diagnosticsNotes.path().string().c_str());
+            ImGui::Text("Monitor WS: %s", monitorStatusLabel.c_str());
         }
         ImGui::End();
 
@@ -1140,8 +2557,14 @@ int main() {
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         glfwSwapBuffers(window);
+
+        auto frameEnd = std::chrono::steady_clock::now();
+        double frameMs = std::chrono::duration<double, std::milli>(frameEnd - frameStart).count();
+        metricsLogger.recordFrame(frameMs);
+        metricsLogger.flushIfNeeded();
     }
 
+    monitorClient.stop();
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImPlot::DestroyContext();

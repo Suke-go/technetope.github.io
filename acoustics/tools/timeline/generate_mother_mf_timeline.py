@@ -4,6 +4,14 @@ Generate a SoundTimeline JSON for the MOTHER Earth (Missing Fundamental ver.)
 playback sequence.  The resulting timeline can be consumed by the scheduler
 tool under `acoustics/pc_tools/scheduler`.
 
+Tempo を落としてゆっくり鳴らしたい場合は、CLI オプション `--tempo-scale`
+（デフォルト 1.0）を指定すると `offset_ms` が一括で拡大・縮小される。例:
+`--tempo-scale 4.2` で 240ms → 約 1000ms になり、1 音 / 秒ペースのタイムラインを
+コード変更無しで生成できる。
+DRY_RUN=0 HOST=172.20.10.15 \
+SCHED_BIN=$PWD/build/acoustics/scheduler/agent_a_scheduler \
+./acoustics/archive/mother_mf/tools/run_mother_mf.sh
+
 The script encodes the A-section instructions shared by the music team:
 
     - Tempo: 125 BPM (quarter note = 480 ms, eight note = 240 ms)
@@ -12,6 +20,11 @@ The script encodes the A-section instructions shared by the music team:
 
 By default the script emits two A-section iterations and writes the timeline
 JSON to stdout.  Use `--output` to save directly to a file.
+python3 acoustics/tools/timeline/generate_mother_mf_timeline.py \
+  --loops 1 \
+  --melody-gain 1.0 \
+  --bass-gain 1.0 \
+  --output acoustics/pc_tools/scheduler/examples/mother_mf_a_section.json
 """
 
 from __future__ import annotations
@@ -34,6 +47,7 @@ class TimelineStep:
 
 # fmt: off
 A_SECTION_STEPS: Sequence[TimelineStep] = [
+    TimelineStep(0,    "A4_mf",      "A2_mf"),
     TimelineStep(0,    "A4_mf",      "A2_mf"),
     TimelineStep(240,  "Csharp5_mf", "Csharp3_mf"),
     TimelineStep(480,  "E5_mf",      "E3_mf"),
@@ -58,9 +72,25 @@ def _format_offset(offset_ms: int) -> float:
     return round(offset_ms / 1000.0, 6)
 
 
-def _cycle_duration_ms() -> int:
+def _scaled_steps(scale: float) -> Sequence[TimelineStep]:
+    """Return new steps list scaled by tempo."""
+    if scale <= 0.0:
+        raise ValueError("tempo-scale must be > 0")
+    scaled: List[TimelineStep] = []
+    for step in A_SECTION_STEPS:
+        scaled.append(
+            TimelineStep(
+                offset_ms=int(round(step.offset_ms * scale)),
+                melody_preset=step.melody_preset,
+                bass_preset=step.bass_preset,
+            )
+        )
+    return scaled
+
+
+def _cycle_duration_ms(steps: Sequence[TimelineStep]) -> int:
     """Duration of one full A-section iteration in milliseconds."""
-    return A_SECTION_STEPS[-1].offset_ms
+    return steps[-1].offset_ms
 
 
 def build_events(
@@ -68,16 +98,17 @@ def build_events(
     melody_gain: float,
     bass_gain: float,
     final_stop_delay_ms: int,
+    steps: Sequence[TimelineStep],
 ) -> List[dict]:
     """Construct the ordered event list for the timeline JSON."""
     if loops < 1:
         raise ValueError("loop count must be >= 1")
 
-    cycle_ms = _cycle_duration_ms()
+    cycle_ms = _cycle_duration_ms(steps)
     events: List[dict] = []
 
     for loop_index in range(loops):
-        for step_index, step in enumerate(A_SECTION_STEPS):
+        for step_index, step in enumerate(steps):
             # The first step of subsequent loops is already covered by the
             # last step of the previous loop (which retriggers the A4 chord).
             if loop_index > 0 and step_index == 0:
@@ -136,13 +167,16 @@ def build_timeline(
     melody_gain: float,
     bass_gain: float,
     final_stop_delay_ms: int,
+    tempo_scale: float,
 ) -> dict:
     """Return the full timeline document."""
+    steps = _scaled_steps(tempo_scale)
     events = build_events(
         loops=loops,
         melody_gain=melody_gain,
         bass_gain=bass_gain,
         final_stop_delay_ms=final_stop_delay_ms,
+        steps=steps,
     )
     return {
         "version": "1.2",
@@ -197,6 +231,12 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         help="Optional path to write the resulting JSON. Stdout if omitted.",
     )
+    parser.add_argument(
+        "--tempo-scale",
+        type=float,
+        default=1.0,
+        help="Multiply all offsets by this factor (e.g., 4.0 makes ~1s per note).",
+    )
     return parser.parse_args()
 
 
@@ -207,6 +247,7 @@ def main() -> None:
         melody_gain=args.melody_gain,
         bass_gain=args.bass_gain,
         final_stop_delay_ms=args.final_stop_delay,
+        tempo_scale=args.tempo_scale,
     )
     json_payload = json.dumps(timeline, indent=2)
     if args.output:

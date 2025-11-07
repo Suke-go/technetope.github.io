@@ -114,7 +114,6 @@ void playbackTask(void* pvParameters) {
     if (due) {
       if (due->is_stop) {
         Serial.println("[Playback] Stop event dequeued");
-        playback_queue.clear();
         audio_player.stop();
         active_item.reset();
         continue;
