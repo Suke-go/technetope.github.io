@@ -12,10 +12,19 @@
   <link href="https://fonts.googleapis.com/css2?family=Bitcount+Grid+Single+Ink:wght@100..900&family=DotGothic16&display=swap" rel="stylesheet">
 
   <style>
-    body {
-      opacity: 0;
-      transition: opacity 0.8s ease-in;
+    :root {
+      --max-width: 1000px;
+      --pad-inline: 20px;
+      --pad-left-desktop: 80px; /* 左余白（デスクトップ） */
+      --pad-block: 40px;
+      --line-height: 1.9;
+      --h1-size: 2.4rem;
+      --h2-size: 1.5rem;
+      --text-size: 1rem;
+      --timeline-text: 0.95rem;
     }
+
+    body { opacity: 0; transition: opacity 0.8s ease-in; }
     body.loaded { opacity: 1; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -25,119 +34,91 @@
       background-image: url('https://raw.githubusercontent.com/Rhizobium-gits/Technetope/main/figure/background_cloud4.png');
       background-size: cover;
       background-position: center;
-      background-attachment: fixed;
+      background-attachment: fixed; /* デスクトップ */
       background-repeat: no-repeat;
       color: #ffffff;
-      line-height: 1.9;
-      padding: 40px 20px 40px 80px;
-      max-width: 1000px;
+      line-height: var(--line-height);
       margin: 0;
       position: relative;
+      /* 本文余白（左に広めの余白をとるレイアウト） */
+      padding: var(--pad-block) var(--pad-inline) var(--pad-block) var(--pad-left-desktop);
+      max-width: var(--max-width);
     }
 
-    .ripple-container {
-      position: fixed; top: 50%; left: 50%;
-      width: 0; height: 0; pointer-events: none; z-index: 5;
-    }
-    .ripple {
-      position: absolute; border: 0.01px solid #000000;
-      border-radius: 50%; opacity: 0;
-      top: 50%; left: 50%; transform: translate(-50%, -50%);
-    }
+    /* 画面オーバーレイのアニメ */
+    .ripple-container { position: fixed; top: 50%; left: 50%; width: 0; height: 0; pointer-events: none; z-index: 5; }
+    .ripple { position: absolute; border: 0.01px solid #000000; border-radius: 50%; opacity: 0; top: 50%; left: 50%; transform: translate(-50%, -50%); }
     .ripple1 { width: 100px; height: 100px; animation: rippleEffect 2s ease-out; }
     .ripple2 { width: 100px; height: 100px; animation: rippleEffect 2s ease-out 0.2s; }
     .ripple3 { width: 100px; height: 100px; animation: rippleEffect 2s ease-out 0.4s; }
     .ripple4 { width: 100px; height: 100px; animation: rippleEffect 2s ease-out 0.6s; }
     .ripple5 { width: 100px; height: 100px; animation: rippleEffect 2s ease-out 0.8s; }
+    @keyframes rippleEffect { 0% { transform: translate(-50%, -50%) scale(0.1); opacity: 0; } 30% { opacity: 1; } 100% { transform: translate(-50%, -50%) scale(15); opacity: 0; } }
 
-    @keyframes rippleEffect {
-      0% { transform: translate(-50%, -50%) scale(0.1); opacity: 0; }
-      30% { opacity: 1; }
-      100% { transform: translate(-50%, -50%) scale(15); opacity: 0; }
-    }
-
-    body::before {
-      content: ''; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0, 0, 0, 0.6); pointer-events: none; opacity: 0;
-      animation: overlayFadeIn 0.8s ease-in 1.5s forwards; z-index: 10;
-    }
+    body::before { content: ''; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); pointer-events: none; opacity: 0; animation: overlayFadeIn 0.8s ease-in 1.5s forwards; z-index: 10; }
     body > * { position: relative; z-index: 100; }
     @keyframes overlayFadeIn { from { opacity: 0; } to { opacity: 1; } }
-    body::after {
-      content: ''; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(255, 255, 255, 0.15); pointer-events: none;
-      z-index: 1; opacity: 0; animation: fadeInOverlay 0.8s ease-in 1.5s forwards;
-    }
+    body::after { content: ''; position: fixed; inset: 0; background: rgba(255, 255, 255, 0.15); pointer-events: none; z-index: 1; opacity: 0; animation: fadeInOverlay 0.8s ease-in 1.5s forwards; }
     @keyframes fadeInOverlay { to { opacity: 1; } }
 
     .logo, h1, .artist, .artist-image, .artist-content { position: relative; z-index: 10; }
     .logo { position: fixed; top: 30px; left: 30px; z-index: 100; }
-    .logo a {
-      font-family: 'Yu Mincho', serif;
-      font-size: 1.5em; color: #000000; text-decoration: none;
-      letter-spacing: 0.1em; font-weight: 300; transition: opacity 0.3s;
-    }
+    .logo a { font-family: 'Yu Mincho', serif; font-size: 1.5em; color: #000000; text-decoration: none; letter-spacing: 0.1em; font-weight: 300; transition: opacity 0.3s; }
     .logo a:hover { opacity: 0.6; }
 
-    h1 {
-      font-size: 2em; margin-bottom: 80px; margin-top: 60px;
-      font-weight: 300; letter-spacing: 0.05em;
-      padding: 8px 15px; display: inline-block;
-      font-family: 'Bitcount Grid Single Ink', monospace; color: #fff;
-    }
-    h1 span {
-      display: inline-block; transition: all 0.6s ease;
-      font-family: 'Bitcount Grid Single Ink', monospace;
-    }
-    h1 span.serif {
-      font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
-      transform: scale(1.05);
-    }
+    h1 { font-size: var(--h1-size); margin: 60px 0 80px; font-weight: 300; letter-spacing: 0.05em; padding: 8px 15px; display: inline-block; font-family: 'Bitcount Grid Single Ink', monospace; color: #fff; }
+    h1 span { display: inline-block; transition: all 0.6s ease; font-family: 'Bitcount Grid Single Ink', monospace; }
+    h1 span.serif { font-family: "Yu Mincho", "Hiragino Mincho ProN", serif; transform: scale(1.05); }
 
-    h2 {
-      font-size: 1.5em; margin-bottom: 25px; font-weight: 400; letter-spacing: 0.03em;
-      padding: 8px 15px; display: inline-block;
-      font-family: "DotGothic16", sans-serif; color: #fff;
-    }
-    h2 span {
-      display: inline-block;
-      transition: all 0.6s ease;
-      font-family: "DotGothic16", sans-serif;
-    }
-    h2 span.serif {
-      font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
-      transform: scale(1.05);
-    }
+    h2 { font-size: var(--h2-size); margin-bottom: 25px; font-weight: 400; letter-spacing: 0.03em; padding: 8px 15px; display: inline-block; font-family: "DotGothic16", sans-serif; color: #fff; }
+    h2 span { display: inline-block; transition: all 0.6s ease; font-family: "DotGothic16", sans-serif; }
+    h2 span.serif { font-family: "Yu Mincho", "Hiragino Mincho ProN", serif; transform: scale(1.05); }
 
     .artist { margin-bottom: 120px; display: flex; gap: 40px; align-items: flex-start; }
-    .artist-image { flex-shrink: 0; width: 200px; height: 200px;
-      background: rgba(245,245,245,0.1);
-      border: 1px solid rgba(255,255,255,0.3);
-      display: flex; align-items: center; justify-content: center;
-      color: #ccc; font-size: 0.85em; }
-    .artist-image img { width: 100%; height: 100%; object-fit: cover; }
-    .artist-content { flex: 1; }
+    .artist-image { flex-shrink: 0; width: 220px; aspect-ratio: 1 / 1; background: rgba(245,245,245,0.1); border: 1px solid rgba(255,255,255,0.3); display: flex; align-items: center; justify-content: center; color: #ccc; font-size: 0.85em; overflow: hidden; }
+    .artist-image img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .artist-content { flex: 1; min-width: 0; }
 
-    .bio { margin-bottom: 30px; font-size: 0.95em; line-height: 2; text-align: justify;
-      background: linear-gradient(to right, rgba(0,0,0,0.6) 50%, transparent 50%);
-      background-size: 200% 100%; background-position: 100% 0;
-      padding: 10px 15px; }
-    .section-title { font-size: 1em; font-weight: 500; margin-top: 30px; margin-bottom: 15px; letter-spacing: 0.05em;
-      background: linear-gradient(to right, rgba(0,0,0,0.6) 50%, transparent 50%);
-      background-size: 200% 100%; background-position: 100% 0;
-      padding: 8px 15px; display: inline-block; }
-    .timeline { font-size: 0.9em; line-height: 1.9; color: #fff;
-      background: linear-gradient(to right, rgba(0,0,0,0.6) 50%, transparent 50%);
-      background-size: 200% 100%; background-position: 100% 0;
-      padding: 10px 15px; }
-    .timeline-item { display: flex; margin-bottom: 8px; }
-    .year { min-width: 60px; color: #e0e0e0; }
-    .description { flex: 1; }
+    .bio { margin-bottom: 30px; font-size: var(--text-size); line-height: 2; text-align: justify; background: linear-gradient(to right, rgba(0,0,0,0.6) 50%, transparent 50%); background-size: 200% 100%; background-position: 100% 0; padding: 10px 15px; }
+    .section-title { font-size: 1em; font-weight: 500; margin-top: 30px; margin-bottom: 15px; letter-spacing: 0.05em; background: linear-gradient(to right, rgba(0,0,0,0.6) 50%, transparent 50%); background-size: 200% 100%; background-position: 100% 0; padding: 8px 15px; display: inline-block; }
+
+    .timeline { font-size: var(--timeline-text); line-height: 1.9; color: #fff; background: linear-gradient(to right, rgba(0,0,0,0.6) 50%, transparent 50%); background-size: 200% 100%; background-position: 100% 0; padding: 10px 15px; }
+    .timeline-item { display: grid; grid-template-columns: 68px 1fr; gap: 8px 16px; align-items: start; margin-bottom: 8px; }
+    .year { color: #e0e0e0; letter-spacing: 0.02em; }
+    .description { overflow-wrap: anywhere; }
+
+    /* ===== モバイル最適化：クラスで切替 ===== */
+    body.is-mobile { background-attachment: scroll; /* iOSのパフォーマンス対策 */ padding: 20px 16px; max-width: 100%; }
+    .is-mobile h1 { --h1-size: 1.9rem; margin: 48px 0 32px; letter-spacing: 0.03em; }
+    .is-mobile h2 { --h2-size: 1.25rem; }
+
+    .is-mobile .artist { flex-direction: column; gap: 16px; margin-bottom: 64px; }
+    .is-mobile .artist-image { width: 100%; max-width: 520px; margin: 0 auto; border-width: 0.5px; }
+    .is-mobile .bio { padding: 10px 12px; }
+    .is-mobile .timeline { padding: 10px 12px; }
+    .is-mobile .timeline-item { grid-template-columns: 56px 1fr; }
+
+    .logo.is-dark a { color: #111; }
+
+    /* タブレット補正 */
+    @media (max-width: 1024px) {
+      body { padding: 40px 24px; max-width: 100%; }
+      .artist-image { width: 200px; }
+    }
+
+    /* スマホ幅の最終調整（JSのクラスに加えて保険）*/
+    @media (max-width: 768px) {
+      body { padding: 24px 16px; }
+      .artist { flex-direction: column; gap: 16px; margin-bottom: 64px; }
+      .artist-image { width: 100%; max-width: 520px; margin: 0 auto; }
+      h1 { font-size: 2rem; margin: 48px 0 28px; }
+      h2 { font-size: 1.25rem; }
+    }
   </style>
 </head>
 
 <body>
-  <div class="ripple-container">
+  <div class="ripple-container" aria-hidden="true">
     <div class="ripple ripple1"></div>
     <div class="ripple ripple2"></div>
     <div class="ripple ripple3"></div>
@@ -234,44 +215,55 @@
   </div>
 
   <script>
+    // 端末識別：UAとビューポート幅からモバイルを推定し、クラスを切替
+    function detectDevice() {
+      const ua = navigator.userAgent || navigator.vendor || window.opera;
+      const isTouchWidth = window.matchMedia('(max-width: 768px)').matches;
+      const isMobileUA = /Mobi|Android|iPhone|iPad|iPod/i.test(ua);
+      const mobile = isTouchWidth || isMobileUA;
+      document.body.classList.toggle('is-mobile', mobile);
+      document.body.classList.toggle('is-desktop', !mobile);
+      // 白背景の上に黒いテキストロゴを使う場合
+      document.querySelector('.logo')?.classList.toggle('is-dark', mobile);
+    }
+    detectDevice();
+    window.addEventListener('resize', () => { clearTimeout(window.__resTO); window.__resTO = setTimeout(detectDevice, 150); });
+
+    // 背景画像プリロード
     const bgImage = new Image();
     bgImage.src = 'https://raw.githubusercontent.com/Rhizobium-gits/Technetope/main/figure/background_cloud4.png';
     bgImage.onload = () => document.body.classList.add('loaded');
     bgImage.onerror = () => document.body.classList.add('loaded');
 
     // h1エフェクト Bitcount→明朝
-    const h1 = document.querySelector("h1");
+    const h1 = document.querySelector('h1');
     const h1Text = h1.textContent.trim();
-    h1.textContent = "";
-    const h1Spans = h1Text.split("").map(ch => {
-      const span = document.createElement("span");
+    h1.textContent = '';
+    const h1Spans = h1Text.split('').map(ch => {
+      const span = document.createElement('span');
       span.textContent = ch;
       h1.appendChild(span);
       return span;
     });
     setTimeout(() => {
       const order = h1Spans.map((_, i) => i).sort(() => Math.random() - 0.5);
-      order.forEach((i, idx) => {
-        setTimeout(() => { h1Spans[i].classList.add("serif"); }, idx * 250 + Math.random() * 300);
-      });
+      order.forEach((i, idx) => { setTimeout(() => { h1Spans[i].classList.add('serif'); }, idx * 250 + Math.random() * 300); });
     }, 1700);
 
     // h2エフェクト DotGothic16→明朝
-    const h2List = document.querySelectorAll("h2");
+    const h2List = document.querySelectorAll('h2');
     h2List.forEach((h2, groupIndex) => {
       const text = h2.textContent.trim();
-      h2.textContent = "";
-      const spans = text.split("").map(ch => {
-        const span = document.createElement("span");
+      h2.textContent = '';
+      const spans = text.split('').map(ch => {
+        const span = document.createElement('span');
         span.textContent = ch;
         h2.appendChild(span);
         return span;
       });
       setTimeout(() => {
         const order = spans.map((_, i) => i).sort(() => Math.random() - 0.5);
-        order.forEach((i, idx) => {
-          setTimeout(() => { spans[i].classList.add("serif"); }, idx * 200 + Math.random() * 200);
-        });
+        order.forEach((i, idx) => { setTimeout(() => { spans[i].classList.add('serif'); }, idx * 200 + Math.random() * 200); });
       }, 2200 + groupIndex * 600);
     });
   </script>
