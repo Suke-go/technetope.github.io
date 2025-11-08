@@ -6,9 +6,14 @@
 #include <chrono>
 #include <cmath>
 #include <csignal>
+#include <future>
 #include <iostream>
+#include <mutex>
 #include <thread>
+#include <unordered_map>
 #include <vector>
+
+#include <nlohmann/json.hpp>
 
 namespace {
 
@@ -40,13 +45,18 @@ double oscillating_radius(double elapsed_seconds) {
   return std::max(30.0, radius);
 }
 
-bool wait_for_connection(toio::api::FleetControl &control,
-                         const toio::api::CubeHandle &cube) {
+struct PendingConnect {
+  PendingConnect() : future(promise.get_future()) {}
+  std::promise<bool> promise;
+  std::future<bool> future;
+  std::mutex mutex;
+  std::string message;
+};
+
+bool wait_for_snapshot_connection(toio::api::FleetControl &control,
+                                  const toio::api::CubeHandle &cube) {
   const auto deadline =
       std::chrono::steady_clock::now() + kConnectionTimeout;
-  if (!control.connect(cube, false)) {
-    return false;
-  }
 
   while (std::chrono::steady_clock::now() < deadline &&
          !g_interrupted.load()) {
@@ -77,6 +87,56 @@ int main(int argc, char **argv) {
       std::cout << "[goal " << key << "] " << message << std::endl;
     });
 
+    std::mutex connect_mutex;
+    std::unordered_map<std::string, std::shared_ptr<PendingConnect>>
+        pending_connects;
+
+    control.set_message_callback(
+        [&](const std::string &server_id, const nlohmann::json &json) {
+          auto type_it = json.find("type");
+          if (type_it == json.end() || !type_it->is_string() ||
+              *type_it != "result") {
+            return;
+          }
+          auto payload_it = json.find("payload");
+          if (payload_it == json.end() || !payload_it->is_object()) {
+            return;
+          }
+          const auto &payload = *payload_it;
+          if (payload.value("cmd", "") != "connect") {
+            return;
+          }
+          const std::string target = payload.value("target", "");
+          if (target.empty()) {
+            return;
+          }
+          const std::string key = server_id + ":" + target;
+          std::shared_ptr<PendingConnect> pending;
+          {
+            std::lock_guard<std::mutex> lock(connect_mutex);
+            auto it = pending_connects.find(key);
+            if (it == pending_connects.end()) {
+              return;
+            }
+            pending = it->second;
+            pending_connects.erase(it);
+          }
+          std::string message;
+          if (auto message_it = payload.find("message");
+              message_it != payload.end() && message_it->is_string()) {
+            message = message_it->get<std::string>();
+          } else if (auto reason_it = payload.find("reason");
+                     reason_it != payload.end() && reason_it->is_string()) {
+            message = reason_it->get<std::string>();
+          }
+          {
+            std::lock_guard<std::mutex> guard(pending->mutex);
+            pending->message = std::move(message);
+          }
+          const bool success = payload.value("status", "") == "success";
+          pending->promise.set_value(success);
+        });
+
     control.start();
 
     const auto cubes = control.cubes();
@@ -91,13 +151,55 @@ int main(int argc, char **argv) {
       if (g_interrupted.load()) {
         break;
       }
+      const std::string key = cube.server_id + ":" + cube.cube_id;
+      auto pending = std::make_shared<PendingConnect>();
+      {
+        std::lock_guard<std::mutex> lock(connect_mutex);
+        pending_connects[key] = pending;
+      }
+
       std::cout << "Connecting to " << cube.server_id << ":" << cube.cube_id
                 << " ... " << std::flush;
-      if (wait_for_connection(control, cube)) {
+      if (!control.connect(cube, true)) {
+        std::lock_guard<std::mutex> lock(connect_mutex);
+        pending_connects.erase(key);
+        std::cout << "failed (command dispatch)\n";
+        continue;
+      }
+
+      bool command_success = false;
+      const auto result_status =
+          pending->future.wait_for(kConnectionTimeout);
+      if (result_status == std::future_status::ready) {
+        command_success = pending->future.get();
+      } else {
+        {
+          std::lock_guard<std::mutex> lock(connect_mutex);
+          pending_connects.erase(key);
+        }
+        std::cout << "failed (no response)\n";
+        continue;
+      }
+
+      if (!command_success) {
+        std::string message;
+        {
+          std::lock_guard<std::mutex> guard(pending->mutex);
+          message = pending->message;
+        }
+        if (!message.empty()) {
+          std::cout << "failed: " << message << "\n";
+        } else {
+          std::cout << "failed\n";
+        }
+        continue;
+      }
+
+      if (wait_for_snapshot_connection(control, cube)) {
         std::cout << "connected\n";
         active_cubes.push_back(cube);
       } else {
-        std::cout << "failed\n";
+        std::cout << "failed (state update timeout)\n";
       }
     }
 
