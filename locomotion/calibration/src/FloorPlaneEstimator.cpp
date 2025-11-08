@@ -131,9 +131,10 @@ std::optional<FloorPlaneEstimate> FloorPlaneEstimator::Estimate(
     }
   }
 
-  if (points.size() < static_cast<size_t>(std::max(config_.min_sample_count, 3))) {
-    spdlog::warn("Not enough depth samples for plane estimation ({} points).",
-                 points.size());
+  if (points.size() <
+      static_cast<size_t>(std::max({config_.min_sample_count, 3, config_.min_valid_points}))) {
+    spdlog::warn("Not enough depth samples for plane estimation ({} points, require ≥ {}).",
+                 points.size(), config_.min_valid_points);
     return std::nullopt;
   }
 
@@ -175,8 +176,10 @@ std::optional<FloorPlaneEstimate> FloorPlaneEstimator::Estimate(
     }
   }
 
-  if (best_inliers == 0) {
-    spdlog::warn("Floor plane estimation failed: no inliers found.");
+  if (best_inliers < config_.min_valid_points) {
+    spdlog::warn(
+        "Floor plane estimation failed: only {} inliers found (need ≥ {}).",
+        best_inliers, config_.min_valid_points);
     return std::nullopt;
   }
 
@@ -204,6 +207,14 @@ std::optional<FloorPlaneEstimate> FloorPlaneEstimator::Estimate(
                             ? 0.0
                             : std::sqrt(sum_sq / static_cast<double>(best_model.inliers.size()));
 
+  double normal_norm =
+      std::sqrt(refined_plane[0] * refined_plane[0] + refined_plane[1] * refined_plane[1] +
+                refined_plane[2] * refined_plane[2]);
+  double camera_height_mm = 0.0;
+  if (normal_norm > kEpsilon) {
+    camera_height_mm = std::abs(refined_plane[3]) / normal_norm;
+  }
+
   FloorPlaneEstimate estimate;
   estimate.plane = cv::Vec4f(static_cast<float>(refined_plane[0]),
                              static_cast<float>(refined_plane[1]),
@@ -211,6 +222,8 @@ std::optional<FloorPlaneEstimate> FloorPlaneEstimator::Estimate(
                              static_cast<float>(refined_plane[3]));
   estimate.plane_std_mm = plane_std_mm;
   estimate.inlier_ratio = inlier_ratio;
+  estimate.inlier_count = static_cast<int>(best_model.inliers.size());
+  estimate.camera_height_mm = camera_height_mm;
   return estimate;
 }
 

@@ -34,6 +34,16 @@ CalibrationConfig loadConfigFromJson(const std::filesystem::path& path) {
       dst = j[key].get<double>();
     }
   };
+  auto load_float = [&j](const char* key, float& dst) {
+    if (j.contains(key)) {
+      dst = j[key].get<float>();
+    }
+  };
+  auto load_bool = [&j](const char* key, bool& dst) {
+    if (j.contains(key)) {
+      dst = j[key].get<bool>();
+    }
+  };
   auto load_uint64 = [&j](const char* key, uint64_t& dst) {
     if (j.contains(key)) {
       dst = j[key].get<uint64_t>();
@@ -50,22 +60,35 @@ CalibrationConfig loadConfigFromJson(const std::filesystem::path& path) {
   load_int("depth_width", config.depth_width);
   load_int("depth_height", config.depth_height);
   load_int("fps", config.fps);
+  load_double("depth_min_distance_mm", config.depth_min_distance_mm);
+  load_double("depth_max_distance_mm", config.depth_max_distance_mm);
+  load_double("expected_depth_scale_m", config.expected_depth_scale_m);
   load_int("charuco_squares_x", config.charuco_squares_x);
   load_int("charuco_squares_y", config.charuco_squares_y);
-  load_double("charuco_square_length_mm", config.charuco_square_length_mm);
-  load_double("charuco_marker_length_mm", config.charuco_marker_length_mm);
+  load_float("charuco_square_length_mm", config.charuco_square_length_mm);
+  load_float("charuco_marker_length_mm", config.charuco_marker_length_mm);
   load_int("min_charuco_corners", config.min_charuco_corners);
   load_double("homography_ransac_thresh_px", config.homography_ransac_thresh_px);
   load_double("max_reprojection_error_id", config.max_reprojection_error_id);
+  load_bool("charuco_enable_subpixel_refine", config.charuco_enable_subpixel_refine);
+  load_int("charuco_subpixel_window", config.charuco_subpixel_window);
+  load_int("charuco_subpixel_max_iterations", config.charuco_subpixel_max_iterations);
+  load_double("charuco_subpixel_epsilon", config.charuco_subpixel_epsilon);
+  load_bool("enable_floor_plane_fit", config.enable_floor_plane_fit);
   load_double("floor_inlier_threshold_mm", config.floor_inlier_threshold_mm);
   load_int("floor_ransac_iterations", config.floor_ransac_iterations);
   load_double("floor_min_inlier_ratio", config.floor_min_inlier_ratio);
   load_double("floor_z_min_mm", config.floor_z_min_mm);
   load_double("floor_z_max_mm", config.floor_z_max_mm);
   load_int("floor_downsample_grid", config.floor_downsample_grid);
+  load_int("floor_min_valid_points", config.floor_min_valid_points);
   load_double("max_plane_std_mm", config.max_plane_std_mm);
   load_int("session_attempts", config.session_attempts);
   load_uint64("random_seed", config.random_seed);
+  load_double("camera_height_warn_min_mm", config.camera_height_warn_min_mm);
+  load_double("camera_height_warn_max_mm", config.camera_height_warn_max_mm);
+  load_bool("enable_spatial_filter", config.enable_spatial_filter);
+  load_bool("enable_color_auto_exposure", config.enable_color_auto_exposure);
   load_string("aruco_dictionary", config.aruco_dictionary);
   load_string("playmat_layout_path", config.playmat_layout_path);
   load_string("board_mount_label", config.board_mount_label);
@@ -125,7 +148,19 @@ int main(int argc, char** argv) {
     session_config.min_inlier_ratio = calib_config.floor_min_inlier_ratio;
   }
 
+  // Extract config file directory for path resolution
+  std::filesystem::path config_dir;
+  if (std::filesystem::exists(config_path)) {
+    config_dir = std::filesystem::absolute(config_path).parent_path();
+  } else {
+    config_dir = std::filesystem::current_path();
+  }
+  
   CalibrationPipeline pipeline(calib_config);
+  if (!pipeline.initialize(config_dir.string())) {
+    std::cerr << "[ERROR] Failed to initialize calibration pipeline.\n";
+    return 1;
+  }
   CalibrationSession session(std::move(pipeline), session_config);
 
   auto result = session.Run();

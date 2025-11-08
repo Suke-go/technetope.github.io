@@ -136,7 +136,8 @@ locomotion/calibration/
 
 ### 3.3 ホモグラフィ推定
 - `cv::findHomography` を RANSAC モードで呼び出し、閾値は Pixel 空間で `CalibrationConfig::homography_ransac_thresh_px` を使用する。
-- 変換先は toio Position ID 座標系（例: PDF 参照の開始点 `Start (x=98, y=142)`、終了点 `End (x=402, y=358)`）とする。
+- 変換先は toio Position ID 座標系（例: PDF 参照の開始点 `Start (x=34, y=35)`、終了点 `End (x=339, y=250)` for face #01）とする。
+- 連番マット（TMD01SS）の場合は、各面の座標範囲をPDFから確認し、使用する面に応じて設定を更新すること。
 - `PlaymatLayout` が提供する Charuco ボード座標（mm）→ Position ID のアフィン変換を適用して対応点を生成し、`H_color_to_position` を推定する。
 - マットごとのオフセット・回転は `PlaymatLayout` 内部で処理される。
 - `CalibrationSnapshot::reprojection_error` は Position ID 座標系の平均二乗平方根（RMS）として算出する。
@@ -371,12 +372,10 @@ sudo ./capture_calibration
 ### 次のステップ
 
 **推奨される実装順序:**
-1. CalibrationPipeline に Intrinsics 処理を追加（最優先）
-2. CalibrationConfig および FloorPlaneEstimatorConfig を拡張
-3. CalibrationSnapshot に intrinsics フィールドを追加
-4. FloorPlaneEstimator の API 拡張（rs2_intrinsics 対応）
-5. CalibrationSession の JSON 出力を検証
-6. 統合テストで全フローを確認
+1. QC ランナー（`tools/run_calibration_qc.*`）の実装と ctest 連携
+2. モック/実機テストの整備（`test_floor_plane_estimator.cpp` など）
+3. リトライ結果の永続化・レポート整形を `CalibrationSession` に追加
+4. 必要に応じて内部ヘッダー配置の整理
 
 **検証方法:**
 ```bash

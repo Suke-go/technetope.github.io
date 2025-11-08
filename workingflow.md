@@ -500,13 +500,6 @@ All calibration metrics are within acceptable ranges.
 3. **ヘッダー配置の整理（任意）**
    - 内部専用クラス（例: `FloorPlaneEstimator`）を `src/` 配下に移動するか、公開API化の方針を明記
 
-6. **CalibrationSession: JSONスキーマv2.0完全対応の確認**
-   - `validation` フィールドの実装確認
-   - スキーマバージョン "2.0" の出力確認
-
-7. **2.4 QC スクリプト実装**
-   - まだ未着手
-
 ### Apple Silicon環境での開発注意
 
 **重要:** macOS Apple Silicon環境でRealSenseを使用する場合、特別な対処が必要です。

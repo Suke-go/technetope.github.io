@@ -17,6 +17,7 @@ struct FloorPlaneEstimatorConfig {
   double z_min_mm{300.0};
   double z_max_mm{1500.0};
   int downsample_grid{4};
+  int min_valid_points{100};
   uint64_t random_seed{42};
 };
 
@@ -24,6 +25,8 @@ struct FloorPlaneEstimate {
   cv::Vec4f plane;
   double plane_std_mm{0.0};
   double inlier_ratio{0.0};
+  int inlier_count{0};
+  double camera_height_mm{0.0};
 };
 
 class FloorPlaneEstimator {

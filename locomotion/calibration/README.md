@@ -61,8 +61,9 @@ locomotion/calibration/
 ## toio プレイマットと Charuco レイアウトの用意手順
 
 1. **プレイマット実測**  
-   - 参考 PDF `locomotion/toio_playmat.pdf` の Start/End ID（例: `Start (98,142)`, `End (402,358)`）を基準に、実際のマットで位置・向きを確認します。  
+   - 参考 PDF `locomotion/toio_playmat.pdf` の Start/End ID（例: `Start (34,35)`, `End (339,250)` for face #01）を基準に、実際のマットで位置・向きを確認します。  
    - メジャーや定規で横幅・縦幅を測り、ID↔mm 換算の誤差をメモしておきます（後で JSON 更新）。
+   - 連番マット（TMD01SS）の場合は、各面（#01-#12）の座標範囲をPDFから確認してください。
 
 2. **ArUco / Charuco マーカーの作成**  
    - `python locomotion/calibration/tools/generate_marker_sheet.py --output markers_a4_45mm.png --metadata markers_a4_45mm.json` を実行。  
@@ -95,7 +96,25 @@ cmake --build build
 - 出力 `calib_result.json` にはホモグラフィ・床平面・再投影誤差などが保存されます。  
 - 実行には RealSense D435 と Charuco ボードが視野内にある環境が必要です。
 
+## テスト手順
+
+実機テストの詳細な手順については、[TESTING.md](TESTING.md) を参照してください。
+
+**クイックスタート:**
+```bash
+# ビルド
+cmake -B build -DLOCOMOTION_BUILD_TESTS=ON
+cmake --build build
+
+# 実機テスト（macOS、sudo必須）
+sudo killall VDCAssistant AppleCameraAssistant 2>/dev/null || true
+sudo ./build/capture_calibration calibration_config_low_res.json calib_result.json
+```
+
 ## 参考資料
+- [TESTING.md](TESTING.md) - 実機テスト手順書
+- [REQUIREMENTS_CALIBRATION_V2.md](REQUIREMENTS_CALIBRATION_V2.md) - 要件仕様
+- [STATUS.md](STATUS.md) - 実装状況
 - RealSense Align サンプル: https://github.com/IntelRealSense/librealsense/tree/master/examples/align  
 - OpenCV + Charuco キャリブレーション例: https://github.com/opencv/opencv/blob/master/samples/cpp/tutorial_code/calib3d/camera_calibration/charuco_diamond.cpp  
 - ORCA / RVO2 ライブラリ: https://github.com/snape/RVO2

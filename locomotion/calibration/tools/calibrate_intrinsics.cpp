@@ -76,6 +76,9 @@ CalibrationConfig loadCalibrationConfig(const std::filesystem::path& path) {
   load_int("depth_width", config.depth_width);
   load_int("depth_height", config.depth_height);
   load_int("fps", config.fps);
+  load_double("depth_min_distance_mm", config.depth_min_distance_mm);
+  load_double("depth_max_distance_mm", config.depth_max_distance_mm);
+  load_double("expected_depth_scale_m", config.expected_depth_scale_m);
   load_int("charuco_squares_x", config.charuco_squares_x);
   load_int("charuco_squares_y", config.charuco_squares_y);
   load_float("charuco_square_length_mm", config.charuco_square_length_mm);
@@ -94,9 +97,14 @@ CalibrationConfig loadCalibrationConfig(const std::filesystem::path& path) {
   load_double("floor_z_min_mm", config.floor_z_min_mm);
   load_double("floor_z_max_mm", config.floor_z_max_mm);
   load_int("floor_downsample_grid", config.floor_downsample_grid);
+  load_int("floor_min_valid_points", config.floor_min_valid_points);
   load_double("max_plane_std_mm", config.max_plane_std_mm);
   load_int("session_attempts", config.session_attempts);
   load_uint64("random_seed", config.random_seed);
+  load_double("camera_height_warn_min_mm", config.camera_height_warn_min_mm);
+  load_double("camera_height_warn_max_mm", config.camera_height_warn_max_mm);
+  load_bool("enable_spatial_filter", config.enable_spatial_filter);
+  load_bool("enable_color_auto_exposure", config.enable_color_auto_exposure);
   load_string("aruco_dictionary", config.aruco_dictionary);
   load_string("playmat_layout_path", config.playmat_layout_path);
   load_string("board_mount_label", config.board_mount_label);

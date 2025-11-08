@@ -24,12 +24,18 @@ class CalibrationSession {
 
   std::optional<CalibrationResult> Run();
   bool SaveResultJson(const CalibrationResult& result, const std::string& path) const;
+  static CalibrationResult SnapshotToResult(const CalibrationSnapshot& snapshot);
+  static bool SaveResultJson(const CalibrationResult& result,
+                             const std::string& path,
+                             const CalibrationConfig& pipeline_config,
+                             const SessionConfig& session_config,
+                             const std::string& camera_model,
+                             const std::string& camera_serial,
+                             double depth_scale_m);
 
  private:
   CalibrationPipeline pipeline_;
   SessionConfig session_config_;
-
-  static CalibrationResult ToResult(const CalibrationSnapshot& snapshot);
 };
 
 }  // namespace locomotion::calibration

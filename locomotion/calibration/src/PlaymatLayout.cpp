@@ -2,6 +2,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <filesystem>
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <stdexcept>
@@ -51,12 +52,64 @@ cv::Matx33d computeAffine(const std::vector<cv::Point2d>& source_mm,
                      1.0);
 }
 
+std::string resolvePath(const std::string& path, const std::string& base_dir) {
+  namespace fs = std::filesystem;
+  
+  // If path is already absolute, return as-is
+  fs::path path_obj(path);
+  if (path_obj.is_absolute()) {
+    return path;
+  }
+  
+  // If base_dir is provided and not empty, resolve relative to base_dir
+  if (!base_dir.empty()) {
+    fs::path base_path(base_dir);
+    
+    // If base_path is a file, get its parent directory
+    if (fs::exists(base_path) && fs::is_regular_file(base_path)) {
+      base_path = base_path.parent_path();
+    }
+    
+    // If base_path is a directory or absolute, try to resolve
+    if (base_path.is_absolute() || fs::exists(base_path)) {
+      fs::path resolved = base_path / path;
+      resolved = resolved.lexically_normal();
+      if (fs::exists(resolved)) {
+        return resolved.string();
+      }
+    }
+    
+    // Also try as directory path directly
+    if (fs::is_directory(base_path) || !fs::exists(base_path)) {
+      fs::path resolved = base_path / path;
+      resolved = resolved.lexically_normal();
+      if (fs::exists(resolved)) {
+        return resolved.string();
+      }
+    }
+  }
+  
+  // Fallback: try current working directory
+  if (fs::exists(path_obj)) {
+    return fs::absolute(path_obj).string();
+  }
+  
+  // Return original path if nothing works (will fail later with better error message)
+  return path;
+}
+
 }  // namespace
 
 PlaymatLayout PlaymatLayout::LoadFromFile(const std::string& path) {
-  std::ifstream ifs(path);
+  return LoadFromFile(path, "");
+}
+
+PlaymatLayout PlaymatLayout::LoadFromFile(const std::string& path, const std::string& base_dir) {
+  std::string resolved_path = resolvePath(path, base_dir);
+  std::ifstream ifs(resolved_path);
   if (!ifs.good()) {
-    throw std::runtime_error("Failed to open playmat layout file: " + path);
+    throw std::runtime_error("Failed to open playmat layout file: " + resolved_path + 
+                             (base_dir.empty() ? "" : " (resolved from base: " + base_dir + ")"));
   }
 
   nlohmann::json j;
@@ -118,6 +171,8 @@ PlaymatLayout PlaymatLayout::LoadFromFile(const std::string& path) {
       mount.board_id = board_id;
       mount.label = mount_label;
       mount.affine_mm_to_position = computeAffine(source_mm, target_id);
+      mount.board_points_mm = source_mm;
+      mount.position_id_points = target_id;
 
       layout.mount_index_[mount.label] = layout.mounts_.size();
       layout.mounts_.push_back(mount);

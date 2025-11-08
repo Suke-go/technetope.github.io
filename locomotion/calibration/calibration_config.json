@@ -1,0 +1,45 @@
+{
+  "color_width": 640,
+  "color_height": 480,
+  "depth_width": 640,
+  "depth_height": 480,
+  "fps": 15,
+  "depth_min_distance_mm": 2300.0,
+  "depth_max_distance_mm": 2800.0,
+  "expected_depth_scale_m": 0.001,
+
+  "charuco_squares_x": 5,
+  "charuco_squares_y": 7,
+  "charuco_square_length_mm": 45.0,
+  "charuco_marker_length_mm": 33.0,
+
+  "min_charuco_corners": 12,
+  "homography_ransac_thresh_px": 3.0,
+  "max_reprojection_error_id": 8.0,
+  "charuco_enable_subpixel_refine": true,
+  "charuco_subpixel_window": 5,
+  "charuco_subpixel_max_iterations": 30,
+  "charuco_subpixel_epsilon": 0.1,
+
+  "enable_floor_plane_fit": true,
+  "floor_inlier_threshold_mm": 8.0,
+  "floor_ransac_iterations": 500,
+  "floor_min_inlier_ratio": 0.7,
+  "floor_z_min_mm": 2400.0,
+  "floor_z_max_mm": 2800.0,
+  "floor_downsample_grid": 4,
+  "floor_min_valid_points": 100,
+
+  "max_plane_std_mm": 8.0,
+  "session_attempts": 5,
+  "random_seed": 42,
+  "camera_height_warn_min_mm": 2500.0,
+  "camera_height_warn_max_mm": 2700.0,
+  "enable_spatial_filter": true,
+  "enable_color_auto_exposure": true,
+
+  "aruco_dictionary": "DICT_4X4_50",
+  "playmat_layout_path": "config/toio_playmat.json",
+  "board_mount_label": "center_mount_nominal",
+  "log_level": "debug"
+}

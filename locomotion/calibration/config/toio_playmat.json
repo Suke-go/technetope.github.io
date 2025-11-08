@@ -1,20 +1,23 @@
 {
   "schema_version": 1,
-  "description": "Nominal layout for toio A3 simple playmat (#01-#06) with centrally mounted 5x7 Charuco board.",
+  "description": "Nominal layout for toio A3 simple playmat (#01) from sequential mat (TMD01SS) with centrally mounted 5x7 Charuco board.",
   "position_id_units": "id",
   "playmats": [
     {
       "id": "a3_simple",
-      "label": "A3 Simple Playmat",
+      "label": "A3 Simple Playmat (#01)",
       "position_id_extent": {
-        "min": { "x": 98.0, "y": 142.0 },
-        "max": { "x": 402.0, "y": 358.0 }
+        "min": { "x": 34.0, "y": 35.0 },
+        "max": { "x": 339.0, "y": 250.0 }
       },
       "physical_size_mm": { "width": 420.0, "height": 297.0 },
-      "id_per_mm": { "x": 0.7238095238, "y": 0.7272727273 },
+      "id_per_mm": { "x": 0.7261904762, "y": 0.7239057239 },
       "notes": [
-        "Start (x=98, y=142) and End (x=402, y=358) are taken from toio playmat reference PDF.",
-        "ID↔mm換算は公称値。実機測定で再補正すること。"
+        "Start (x=34, y=35) and End (x=339, y=250) are taken from toio sequential mat (TMD01SS) reference PDF page 2.",
+        "This corresponds to face #01 (top-left) of the 3×4 grid layout.",
+        "ID↔mm換算は公称値（nominal value）。実機測定で再補正すること。",
+        "Coordinate ranges: Column 1 (x=34-339), Row 1 (y=35-250)",
+        "Conversion factors: x = 305 units / 420mm ≈ 0.7262, y = 215 units / 297mm ≈ 0.7239"
       ]
     }
   ],
@@ -37,22 +40,24 @@
         "correspondences": [
           {
             "board_point_mm": { "x": 0.0, "y": 0.0 },
-            "position_id": { "x": 184.8571428571, "y": 151.8181818182 }
+            "position_id": { "x": 121.1428571429, "y": 44.7727272727 }
           },
           {
             "board_point_mm": { "x": 180.0, "y": 0.0 },
-            "position_id": { "x": 315.1428571429, "y": 151.8181818182 }
+            "position_id": { "x": 251.8571428571, "y": 44.7727272727 }
           },
           {
             "board_point_mm": { "x": 0.0, "y": 270.0 },
-            "position_id": { "x": 184.8571428571, "y": 348.1818181818 }
+            "position_id": { "x": 121.1428571429, "y": 240.2272727273 }
           }
         ]
       },
       "notes": [
-        "Charuco ボードの幅/高さは (squares_x-1)*square_length_mm、(squares_y-1)*square_length_mm を用いた公称値。",
+        "Charuco ボードの幅/高さは (squares_x-1)*square_length_mm = 180mm、(squares_y-1)*square_length_mm = 270mm。",
+        "ボードをプレイマット中央に配置した場合の公称対応点（中央配置: ボード中心 = プレイマット中心）。",
         "実際の貼付位置では上下左右のマージンを測定して上書きすること。",
-        "必要に応じて第四点（対角）や toio Position ID 上の既知点を追記可能。"
+        "必要に応じて第四点（対角）や toio Position ID 上の既知点を追記可能。",
+        "計算式: position_id.x = 34 + (board_x_mm * 0.7261904762), position_id.y = 35 + (board_y_mm * 0.7239057239)"
       ]
     }
   ]

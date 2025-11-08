@@ -1,0 +1,38 @@
+{
+  "human_detection": {
+    "coarse_scale_factor": 4,
+    "fine_roi_margin_px": 20,
+    "min_depth_mm": 2300.0,
+    "max_depth_mm": 2800.0,
+    "foot_depth_min_mm": 2300.0,
+    "foot_depth_max_mm": 2450.0,
+    "head_depth_min_mm": 2400.0,
+    "head_depth_max_mm": 2600.0,
+    "min_person_height_mm": 1200.0,
+    "max_person_height_mm": 2000.0,
+    "min_foot_diameter_mm": 50.0,
+    "max_foot_diameter_mm": 200.0,
+    "min_foot_area_pixels": 100,
+    "ellipse_aspect_ratio": 0.4,
+    "ellipse_vertical_offset": 0.3,
+    "movement_threshold_mm": 30.0,
+    "movement_history_frames": 60,
+    "standing_velocity_threshold_mm_per_s": 50.0,
+    "velocity_alpha": 0.1,
+    "velocity_half_life_seconds": 0.5,
+    "position_smoothing_alpha": 0.3,
+    "noise_threshold_mm": 5.0,
+    "outlier_threshold_std": 3.0,
+    "enable_outlier_rejection": true,
+    "tracking_max_distance_mm": 200.0,
+    "max_tracked_humans": 10,
+    "tracking_timeout_seconds": 2.0,
+    "enable_coarse_to_fine": true,
+    "skip_frames": 0,
+    "morphology_kernel_size": 5,
+    "morphology_iterations": 2,
+    "head_to_foot_search_radius_mm": 150.0,
+    "average_person_height_mm": 1650.0
+  }
+}
+

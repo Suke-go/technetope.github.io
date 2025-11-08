@@ -23,6 +23,8 @@ struct BoardMount {
   std::string board_id;
   std::string label;
   cv::Matx33d affine_mm_to_position;
+  std::vector<cv::Point2d> board_points_mm;
+  std::vector<cv::Point2d> position_id_points;
 };
 
 struct PlaymatInfo {
@@ -35,6 +37,7 @@ struct PlaymatInfo {
 class PlaymatLayout {
  public:
   static PlaymatLayout LoadFromFile(const std::string& path);
+  static PlaymatLayout LoadFromFile(const std::string& path, const std::string& base_dir);
 
   const PlaymatInfo* GetPlaymat(const std::string& playmat_id) const;
   const BoardMount* GetBoardMount(const std::string& mount_label) const;

@@ -6,10 +6,10 @@
 
 ---
 
-## 📊 進捗状況（全体: 85%完了）
+## 📊 進捗状況（全体: 98%完了）
 
 ```
-███████████████████░░ 85%
+███████████████████▓ 98%
 ```
 
 ### コンポーネント別進捗
@@ -18,10 +18,11 @@
 |---------------|------|------|------|
 | CharucoDetector | 100% | ✅ 完了 | 公開API、サブピクセル補正 |
 | PlaymatLayout | 100% | ✅ 完了 | JSON読み込み、アフィン変換 |
-| CalibrationSession | 98% | ✅ ほぼ完了 | JSON v2.0 + validation 出力済 |
-| CalibrationPipeline | 90% | 🟢 完了 | Intrinsics取得＋歪み補正＋床面推定実装 |
-| FloorPlaneEstimator | 95% | 🟢 完了 | RANSAC + 3D点群フィルタリング対応 |
-| QC Scripts | 0% | ⬜ 未着手 | - |
+| CalibrationSession | 100% | ✅ 完了 | JSON v2.0 + validation 出力済、ディレクトリ作成修正 |
+| CalibrationPipeline | 100% | ✅ 完了 | Intrinsics取得＋歪み補正＋床面推定実装 |
+| FloorPlaneEstimator | 100% | ✅ 完了 | RANSAC + 3D点群フィルタリング対応 |
+| QC Scripts | 100% | ✅ 完了 | run_calibration_qc.cpp、Markdown/JSONレポート生成 |
+| 統合テスト | 100% | ✅ 完了 | モックデータ、test_floor_plane_estimator、test_calibration_pipeline_integration |
 
 ---
 
@@ -43,23 +44,45 @@
 
 ---
 
-## 🟡 次の優先タスク（2項目）
+## ✅ 完了した新規タスク（2025-11-08 追加実装）
 
-### 1. QC スクリプト & 自動レポート
-- `tools/run_calibration_qc.{cpp,py}` を作成し、RealSense 接続〜スナップショット取得〜判定を自動化
-- `ctest -L qc` から呼び出せるよう CMake に統合、Markdown/JSON レポートのテンプレ追加
+### 4. QC スクリプト & 自動レポート実装
+- ✅ `tools/run_calibration_qc.cpp` を実装し、RealSense 接続チェック〜キャリブレーション実行〜判定を自動化
+- ✅ Intrinsics 検証（fx, fy, cx, cy が期待範囲内かチェック）
+- ✅ Markdown レポート生成（デバイス情報、Intrinsics、キャリブレーション結果、推奨アクション）
+- ✅ JSON レポート生成（機械可読形式でQC結果を出力）
+- ✅ `config/qc_config_example.json` を作成し、QC 閾値のカスタマイズに対応
+- ✅ CMake ctest 統合（`LOCOMOTION_ENABLE_HARDWARE_TESTS=ON` で有効化）
+- ✅ CalibrationPipeline 二重初期化問題の修正（QC ツールから initialize() 削除）
+- ✅ SaveResultJson のディレクトリ作成ロジック修正（親パスが空の場合をハンドリング）
+- ✅ JSON ローダーの全フィールド対応（charuco_enable_subpixel_refine、enable_floor_plane_fit など）
 
-### 2. 統合テストとデータ収集
-- Charuco モックデータ／深度点群のフィクスチャを用意し、`test_floor_plane_estimator.cpp` 等を仕上げる
-- 実機リトライ統計（成功率・平均誤差）を `SessionConfig::save_intermediate_snapshots` を活用して収集
+### 5. 統合テストとモックデータ実装
+- ✅ `test/test_utils.h` を作成し、モックデータ生成ユーティリティを実装
+  - 合成平面点群生成（generateSyntheticPointCloud）
+  - 合成深度画像生成（generateSyntheticDepthImage）
+  - 合成 ChArUco 画像生成（generateSyntheticCharucoImage）
+- ✅ `test/test_floor_plane_estimator.cpp` を実装
+  - 完全平面テスト（ノイズなし）
+  - ノイズ付き平面テスト（5mm ノイズ）
+  - 外れ値を含む平面テスト（10% 外れ値）
+  - 傾斜平面テスト（5度傾斜）
+  - 不十分な点数テスト（エラーハンドリング検証）
+- ✅ `test/test_calibration_pipeline_integration.cpp` を実装
+  - CameraIntrinsics 構造体テスト
+  - CalibrationConfig デフォルト値テスト
+  - CharucoDetector / FloorPlaneEstimator 設定テスト
+  - CalibrationSnapshot 構造体テスト
+- ✅ CMake にユニット/統合テストを追加（`LOCOMOTION_BUILD_TESTS=ON` で有効化）
+- ✅ ハードウェア依存テストを別オプションで制御（`LOCOMOTION_ENABLE_HARDWARE_TESTS`）
 
 ---
 
-## 🟢 その他のタスク
+## 🟡 残りのタスク（優先度: 低）
 
-- QC スクリプト実装（上記）
-- `tools/run_calibration_qc.cpp` or `.py`
-- CMake ctest統合
+- 実機でのリトライ統計収集（成功率・平均誤差の記録）
+- CI/CD パイプラインへのテスト統合
+- パフォーマンスベンチマーク（処理時間計測）
 
 ---
 
@@ -93,16 +116,28 @@ sudo ./capture_calibration
 ## 🧪 検証コマンド
 
 ```bash
-# ビルド
+# ビルド（テストあり）
 cmake -B build -DLOCOMOTION_BUILD_TESTS=ON
 cmake --build build
 
-# モックテスト（sudo不要）
-cd build && ctest
+# モックテスト実行（sudo不要、RealSenseデバイス不要）
+cd build && ctest -L mock
 
-# 実機テスト（Apple Silicon、sudo必須）
+# すべてのモック/統合テストを実行
+cd build && ctest --output-on-failure
+
+# 実機QCテスト（Apple Silicon、sudo必須、RealSenseデバイス必須）
+cmake -B build -DLOCOMOTION_BUILD_TESTS=ON -DLOCOMOTION_ENABLE_HARDWARE_TESTS=ON
+cmake --build build
+sudo killall VDCAssistant AppleCameraAssistant 2>/dev/null || true
+cd build && sudo ctest -L qc
+
+# 実機キャリブレーション実行
 sudo killall VDCAssistant AppleCameraAssistant 2>/dev/null || true
 sudo ./build/capture_calibration
+
+# QCツール手動実行
+sudo ./build/run_calibration_qc [config.json] [report.md] [report.json]
 ```
 
 ---
@@ -110,13 +145,30 @@ sudo ./build/capture_calibration
 ## 📅 次のアクション
 
 1. ✅ ドキュメント整備 → **完了**
-2. ⬜ **CalibrationPipelineにIntrinsics処理を追加** → **次の最優先タスク**
-3. ⬜ CalibrationConfigの拡張
-4. ⬜ FloorPlaneEstimatorの拡張
-5. ⬜ 統合テストで全フロー検証
-6. ⬜ QCスクリプト実装
+2. ✅ CalibrationPipelineにIntrinsics処理を追加 → **完了**
+3. ✅ CalibrationConfig / FloorPlaneEstimatorの拡張 → **完了**
+4. ✅ 統合テストで全フロー検証 → **完了**
+5. ✅ QCスクリプト実装 → **完了**
+6. ⬜ 実機での動作確認とデバッグ → **次のステップ**
+
+---
+
+## 📋 新規作成ファイル一覧
+
+### ツール
+- `tools/run_calibration_qc.cpp` - QC自動化ツール（デバイスチェック、キャリブレーション、レポート生成）
+
+### 設定ファイル
+- `config/qc_config_example.json` - QC閾値設定のサンプル
+
+### テスト
+- `test/test_utils.h` - モックデータ生成ユーティリティ
+- `test/test_floor_plane_estimator.cpp` - FloorPlaneEstimatorのユニットテスト
+- `test/test_calibration_pipeline_integration.cpp` - パイプライン統合テスト
 
 ---
 
 **更新履歴:**
+- 2025-11-08 (後半): QCスクリプト＋統合テスト実装完了、進捗98%到達
+- 2025-11-08 (前半): Intrinsics処理＋FloorPlaneEstimator＋JSON v2.0 対応を反映
 - 2025-01-08: 初版作成、実装状況の整理完了
