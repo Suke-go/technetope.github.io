@@ -1,8 +1,8 @@
 #include "toio/cli/config_loader.hpp"
+#include "toio/control/goal_controller.hpp"
 #include "toio/middleware/fleet_manager.hpp"
 
 #include <algorithm>
-#include <chrono>
 #include <cstdint>
 #include <cstdlib>
 #include <iomanip>
@@ -10,7 +10,6 @@
 #include <optional>
 #include <sstream>
 #include <string>
-#include <thread>
 #include <unordered_map>
 #include <vector>
 
@@ -22,6 +21,8 @@ using toio::cli::Options;
 using toio::cli::build_fleet_plan;
 using toio::cli::parse_options;
 using toio::cli::print_usage;
+using toio::control::GoalController;
+using toio::control::GoalOptions;
 using toio::middleware::CubeSnapshot;
 using toio::middleware::FleetManager;
 using toio::middleware::LedColor;
@@ -117,6 +118,9 @@ void print_help() {
                "require=0 to skip result\n"
             << "  moveall <L> <R> [require] Broadcast move to all cubes\n"
             << "  stop                      Shortcut for move 0 0\n"
+            << "  goal <X> <Y> [stop]       Drive active cube toward goal (mm)\n"
+            << "  goalstop [cube]           Stop goal task for active/target cube\n"
+            << "  goalstopall               Stop all goal tasks\n"
             << "  led <R> <G> <B>           Set LED color (0-255)\n"
             << "  ledall <R> <G> <B>        Broadcast LED color\n"
             << "  battery                   Query battery once\n"
@@ -152,6 +156,7 @@ private:
   std::optional<std::string> server_id_;
   std::optional<std::string> cube_id_;
 };
+
 
 void print_received(const std::string &server_id, const Json &json) {
   auto extract_target = [](const Json &obj) -> std::string {
@@ -191,6 +196,7 @@ int main(int argc, char **argv) {
         });
     manager.start();
     FleetGuard guard{manager};
+    GoalController goal_controller{manager};
 
     std::unordered_map<std::string, std::string> cube_index;
     for (const auto &[server_id, cube_id] : plan.cube_sequence) {
@@ -269,6 +275,35 @@ int main(int argc, char **argv) {
         } else if (cmd == "stop") {
           auto target = active.get();
           manager.move(target.first, target.second, 0, 0, false);
+        } else if (cmd == "goal" && tokens.size() >= 3) {
+          auto target = active.get();
+          GoalOptions options;
+          options.goal_x = to_int(tokens[1]);
+          options.goal_y = to_int(tokens[2]);
+          if (tokens.size() >= 4) {
+            options.stop_dist =
+                std::max(1.0, static_cast<double>(to_int(tokens[3])));
+          }
+          goal_controller.start_goal(
+              target.first, target.second, options);
+          std::cout << "Goal task started for " << target.second << " -> ("
+                    << options.goal_x << "," << options.goal_y << ")\n";
+        } else if (cmd == "goalstop") {
+          std::pair<std::string, std::string> resolved;
+          if (tokens.size() >= 2) {
+            resolved = resolve_target(tokens[1], cube_index);
+          } else {
+            resolved = active.get();
+          }
+          if (goal_controller.stop_goal(resolved.first, resolved.second)) {
+            std::cout << "Stopped goal task for " << resolved.second << "\n";
+          } else {
+            std::cout << "No goal task running for " << resolved.second
+                      << "\n";
+          }
+        } else if (cmd == "goalstopall") {
+          std::size_t count = goal_controller.stop_all();
+          std::cout << "Stopped " << count << " goal task(s).\n";
         } else if (cmd == "led" && tokens.size() >= 4) {
           auto target = active.get();
           LedColor color{static_cast<std::uint8_t>(to_int(tokens[1])),
