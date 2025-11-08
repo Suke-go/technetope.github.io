@@ -24,8 +24,12 @@ if(NOT nlohmann_json_FOUND)
     FetchContent_MakeAvailable(nlohmann_json)
 endif()
 
+find_package(yaml-cpp 0.7 REQUIRED)
+
 add_library(toio_client STATIC
     src/toio_client.cpp
+    src/middleware/server_session.cpp
+    src/middleware/fleet_manager.cpp
 )
 target_include_directories(toio_client
     PUBLIC
@@ -47,4 +51,4 @@ target_compile_definitions(toio_client
 add_executable(toio_cli
     src/main.cpp
 )
-target_link_libraries(toio_cli PRIVATE toio_client)
+target_link_libraries(toio_cli PRIVATE toio_client yaml-cpp::yaml-cpp)

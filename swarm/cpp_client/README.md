@@ -29,7 +29,8 @@ cmake --build build
 起動後は以下のようなコマンドを入力できます。
 ```
 help            # コマンド一覧
-use F3H         # 操作対象 Cube を切り替え（未登録IDは自動登録）
+status          # 状態スナップショットを表示
+use F3H         # 操作対象 Cube を切り替え
 connect         # アクティブ Cube を接続
 disconnect      # アクティブ Cube を切断
 move -30 30 0   # 左右モーター出力、末尾0でresultレス省略
@@ -38,9 +39,13 @@ stop            # move 0 0 のショートカット
 led 255 0 0     # LED を赤に
 ledall 0 0 255  # 既知すべての Cube を同じ色に
 battery         # 電池クエリ
+batteryall      # 既知すべての Cube に電池クエリ
 pos             # 位置を単発クエリ
+posall          # 全 Cube の位置を単発クエリ
 subscribe       # 位置購読開始（notify true）
+subscribeall    # 全 Cube の位置購読開始
 unsubscribe     # 購読解除
+unsubscribeall  # 全 Cube の購読解除
 exit            # 終了
 ```
 

@@ -1,0 +1,62 @@
+servers:
+  - id: 5b-00               # CLI で参照する server_id
+    # host: 192.168.40.45
+    host: 5b-00.local
+    port: 8765
+    endpoint: /ws
+    default_require_result: true  # 省略時は false
+    cubes:
+      - id: 534
+        auto_connect: true
+        initial_led: [0, 100, 0]
+      - id: p84
+        auto_connect: true
+        initial_led: [30, 100, 0]
+      - id: d1i
+        auto_connect: true
+        initial_led: [0, 0, 100]
+      - id: 38t
+        auto_connect: true
+        initial_led: [100, 0, 100]
+      - id : d8J
+        auto_connect: true
+        initial_led: [0, 100, 100]
+  - id: 5b-01
+    host: 5b-01.local
+    port: 8765
+    endpoint: /ws
+    default_require_result: true  # 省略時は false
+    cubes:
+      - id: n3Q
+        auto_connect: true
+        initial_led: [100, 0, 0]
+      - id: F3H
+        auto_connect: true
+        initial_led: [100, 30, 0]
+      - id: D4i
+        auto_connect: true
+        initial_led: [0, 0, 100]
+      - id: c5C
+        auto_connect: true
+        initial_led: [100, 0, 100]
+      - id : A3Q
+        auto_connect: true
+        initial_led: [0, 100, 100]
+  - id: 5b-02
+    host: 5b-02.local
+    port: 8765
+    endpoint: /ws
+    default_require_result: true  # 省略時は false
+    cubes:
+      - id: a7n
+        auto_connect: true
+        initial_led: [50, 50, 50]
+      - id: m7d
+        auto_connect: true
+        initial_led: [50, 50, 50]
+      - id: F8N
+        auto_connect: true
+        initial_led: [50, 50, 50]
+      - id: 83T
+        auto_connect: true
+        initial_led: [50, 50, 50]

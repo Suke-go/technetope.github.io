@@ -20,16 +20,73 @@ effective_require(std::optional<bool> require_result, bool fallback) {
   return fallback;
 }
 
+int read_int_field(const nlohmann::json &obj,
+                   const char *key,
+                   int default_value = 0) {
+  auto it = obj.find(key);
+  if (it == obj.end() || it->is_null()) {
+    return default_value;
+  }
+  if (it->is_number_integer()) {
+    return it->get<int>();
+  }
+  if (it->is_number_float()) {
+    return static_cast<int>(it->get<double>());
+  }
+  if (it->is_string()) {
+    try {
+      return std::stoi(it->get<std::string>());
+    } catch (...) {
+      return default_value;
+    }
+  }
+  return default_value;
+}
+
+bool read_bool_field(const nlohmann::json &obj,
+                     const char *key,
+                     bool default_value = false) {
+  auto it = obj.find(key);
+  if (it == obj.end() || it->is_null()) {
+    return default_value;
+  }
+  if (it->is_boolean()) {
+    return it->get<bool>();
+  }
+  if (it->is_number_integer()) {
+    return it->get<int>() != 0;
+  }
+  if (it->is_string()) {
+    const auto value = it->get<std::string>();
+    return value == "1" || value == "true" || value == "True";
+  }
+  return default_value;
+}
+
 Position parse_position(const nlohmann::json &position_json) {
   Position pos{};
-  pos.x = position_json.value("x", 0);
-  pos.y = position_json.value("y", 0);
-  pos.angle = position_json.value("angle", 0);
-  pos.on_mat = position_json.value("on_mat", false);
-  if (position_json.contains("timestamp_ms")) {
-    pos.timestamp_ms = position_json["timestamp_ms"].get<std::uint64_t>();
-  } else if (position_json.contains("timestamp")) {
-    pos.timestamp_ms = position_json["timestamp"].get<std::uint64_t>();
+  pos.x = read_int_field(position_json, "x", 0);
+  pos.y = read_int_field(position_json, "y", 0);
+  pos.angle = read_int_field(position_json, "angle", 0);
+  pos.on_mat = read_bool_field(position_json, "on_mat", false);
+  auto assign_timestamp = [&](const char *key) {
+    auto it = position_json.find(key);
+    if (it != position_json.end()) {
+      if (it->is_number_integer()) {
+        pos.timestamp_ms = it->get<std::uint64_t>();
+      } else if (it->is_string()) {
+        try {
+          pos.timestamp_ms = static_cast<std::uint64_t>(
+              std::stoll(it->get<std::string>()));
+        } catch (...) {
+          // ignore malformed string
+        }
+      }
+    }
+  };
+  assign_timestamp("timestamp_ms");
+  if (pos.timestamp_ms == 0) {
+    assign_timestamp("timestamp");
   }
   return pos;
 }
@@ -147,6 +204,16 @@ bool ServerSession::has_cube(const std::string &cube_id) const {
   return states_.count(cube_id) > 0;
 }
 
+std::vector<std::string> ServerSession::cube_ids() const {
+  std::vector<std::string> ids;
+  std::shared_lock lock(state_mutex_);
+  ids.reserve(states_.size());
+  for (const auto &[cube_id, _] : states_) {
+    ids.push_back(cube_id);
+  }
+  return ids;
+}
+
 CubeState ServerSession::get_state(const std::string &cube_id) const {
   std::shared_lock lock(state_mutex_);
   auto it = states_.find(cube_id);
@@ -214,10 +281,12 @@ void ServerSession::handle_message(const nlohmann::json &json) {
       return;
     }
     if (info == "battery" && payload.contains("battery_level")) {
-      int level = payload["battery_level"].get<int>();
-      update_state(target, [level](CubeState &state) {
-        state.battery_percent = level;
-      });
+      int level = read_int_field(payload, "battery_level", -1);
+      if (level >= 0) {
+        update_state(target, [level](CubeState &state) {
+          state.battery_percent = level;
+        });
+      }
     } else if (info == "position" && payload.contains("position")) {
       Position pos = parse_position(payload["position"]);
       update_state(target, [pos](CubeState &state) { state.position = pos; });
