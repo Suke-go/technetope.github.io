@@ -1,0 +1,12 @@
+servers:
+  - id: default
+    host: 127.0.0.1
+    port: 8765
+    endpoint: /ws
+    cubes:
+      - id: d8J
+        auto_connect: true
+        auto_subscribe: false
+      - id: j2T
+        auto_connect: true
+        auto_subscribe: false

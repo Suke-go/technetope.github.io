@@ -1,0 +1,35 @@
+servers:
+  - id: 5b-00               # CLI で参照する server_id
+    # host: 192.168.40.45
+    host: 5b-00.local
+    port: 8765
+    endpoint: /ws
+    default_require_result: true  # 省略時は false
+    cubes:
+      - id: j2T
+      - id: p84
+      - id: m7d
+      - id: c5C
+      - id: 38t
+  - id: 5b-01
+    host: 5b-01.local
+    port: 8765
+    endpoint: /ws
+    default_require_result: true  # 省略時は false
+    cubes:
+      - id: d8J
+      - id: 56f
+      - id: p2K
+      - id: n3Q
+      - id: c9n
+  - id: 5b-02
+    host: 5b-02.local
+    port: 8765
+    endpoint: /ws
+    default_require_result: true  # 省略時は false
+    cubes:
+      - id: M1F
+      - id: N2H
+      - id: A3Q
+      - id: F3H
+      - id: J9r

@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Toio Field View</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            margin: 0;
+            font-family: "Segoe UI", "Hiragino Sans", Arial, sans-serif;
+            background: radial-gradient(circle at top, #eef2ff, #dfe6ff 45%, #ccd4ff 100%);
+            color: #1f2b46;
+        }
+        .app {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 32px 16px 48px;
+            gap: 24px;
+        }
+        h1 {
+            margin: 0;
+            font-size: 1.8rem;
+            letter-spacing: 0.03em;
+        }
+        .control-panel {
+            width: min(900px, 92vw);
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 18px;
+            padding: 24px;
+            box-shadow: 0 15px 35px rgba(45, 62, 110, 0.18);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .input-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+        }
+        .input-row input {
+            flex: 1;
+            min-width: 160px;
+            padding: 10px 12px;
+            font-size: 16px;
+            border-radius: 8px;
+            border: 1px solid #c5cdea;
+        }
+        .input-row button {
+            padding: 10px 22px;
+            font-size: 15px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            color: #fff;
+            background-color: #4a6bfa;
+            transition: transform 0.1s ease, box-shadow 0.1s ease;
+        }
+        .input-row button.unsubscribe {
+            background-color: #9ba5c7;
+        }
+        .input-row button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 14px rgba(26, 54, 161, 0.2);
+        }
+        .subscriptions {
+            border: 1px solid #d2d9f4;
+            border-radius: 12px;
+            padding: 16px 18px;
+            background-color: #f7f8ff;
+        }
+        .subscriptions h2 {
+            margin: 0 0 8px;
+            font-size: 1.1rem;
+        }
+        .subscription-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .subscription-list li {
+            padding: 8px 14px;
+            border-radius: 999px;
+            background-color: rgba(74, 107, 250, 0.1);
+            border: 1px solid rgba(74, 107, 250, 0.2);
+            font-size: 14px;
+        }
+        .field-container {
+            width: min(720px, 95vw);
+            aspect-ratio: 1 / 1;
+            background: #fdfdff;
+            border-radius: 28px;
+            padding: 24px;
+            box-shadow: 0 20px 40px rgba(20, 35, 120, 0.25);
+        }
+        canvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 20px;
+            border: 2px solid #b7c5f9;
+            background-color: #f6f8ff;
+        }
+        .legend {
+            font-size: 14px;
+            text-align: center;
+            color: #4a5376;
+        }
+        .console {
+            width: min(900px, 92vw);
+            background: #0d152b;
+            color: #1ff2ff;
+            font-family: "SFMono-Regular", Consolas, monospace;
+            padding: 14px 16px;
+            border-radius: 12px;
+            max-height: 220px;
+            overflow-y: auto;
+            font-size: 13px;
+            box-shadow: inset 0 0 12px rgba(0,0,0,0.35);
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <h1>Toio Field View Only</h1>
+        <div class="control-panel">
+            <div class="input-row">
+                <input type="text" id="cube-id-input" placeholder="Subscribe Toio ID (例: 685)">
+                <button id="subscribe-btn">Subscribe</button>
+                <button id="unsubscribe-btn" class="unsubscribe">Unsubscribe</button>
+            </div>
+            <div class="subscriptions">
+                <h2>Subscribed Cubes</h2>
+                <ul class="subscription-list" id="subscription-list">
+                    <li>なし</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="field-container">
+            <canvas id="field-canvas" width="640" height="640"></canvas>
+        </div>
+        <div class="legend" id="legend-text">Field: top-left (45,45) / bottom-right (455,455)</div>
+
+        <div class="console" id="console"></div>
+    </div>
+
+    <script>
+        const ws = new WebSocket("ws://localhost:8765/ws");
+        const consoleElement = document.getElementById("console");
+        const subscriptionList = document.getElementById("subscription-list");
+        const cubeIdInput = document.getElementById("cube-id-input");
+        const legendText = document.getElementById("legend-text");
+        const fieldCanvas = document.getElementById("field-canvas");
+        const fieldCtx = fieldCanvas.getContext("2d");
+
+        const FIELD_MIN = 45;
+        const FIELD_MAX = 455;
+        const FIELD_RANGE = FIELD_MAX - FIELD_MIN;
+        const FIELD_SIZE_MM = 560;
+        const TOIO_WIDTH_MM = 32;
+        const TOIO_LENGTH_MM = 71;
+        const COLOR_PALETTE = [
+            "#4a6bfa", "#f77eb5", "#2ec5ab", "#f5a623", "#9368ff", "#ff6f61"
+        ];
+
+        const fieldState = { cubes: {} };
+        const subscriptions = new Map(); // target -> { color }
+
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement("div");
+            entry.textContent = `[${timestamp}] ${message}`;
+            consoleElement.appendChild(entry);
+            consoleElement.scrollTop = consoleElement.scrollHeight;
+        }
+
+        function ensureReady() {
+            if (ws.readyState !== WebSocket.OPEN) {
+                log("WebSocket not open. Reload to reconnect.");
+                return false;
+            }
+            return true;
+        }
+
+        function send(payload) {
+            if (!ensureReady()) return;
+            ws.send(JSON.stringify(payload));
+        }
+
+        function sendQuery(info, target, notify) {
+            send({
+                type: "query",
+                payload: { info, target, notify }
+            });
+        }
+
+        function addSubscription(target) {
+            if (!target) return;
+            if (!subscriptions.has(target)) {
+                const color = COLOR_PALETTE[subscriptions.size % COLOR_PALETTE.length];
+                subscriptions.set(target, { color });
+            }
+            sendQuery("position", target, true);
+            renderSubscriptions();
+        }
+
+        function removeSubscription(target) {
+            if (!target) return;
+            if (subscriptions.has(target)) {
+                sendQuery("position", target, false);
+                subscriptions.delete(target);
+                fieldState.cubes[target] = undefined;
+                drawField();
+                renderSubscriptions();
+            }
+        }
+
+        function renderSubscriptions() {
+            subscriptionList.innerHTML = "";
+            if (subscriptions.size === 0) {
+                const li = document.createElement("li");
+                li.textContent = "なし";
+                subscriptionList.appendChild(li);
+                return;
+            }
+            subscriptions.forEach((value, target) => {
+                const li = document.createElement("li");
+                li.textContent = `${target}`;
+                li.style.borderColor = value.color;
+                li.style.backgroundColor = `${value.color}22`;
+                subscriptionList.appendChild(li);
+            });
+        }
+
+        function drawField() {
+            const { width, height } = fieldCanvas;
+            fieldCtx.clearRect(0, 0, width, height);
+            fieldCtx.fillStyle = "#f7f8ff";
+            fieldCtx.fillRect(0, 0, width, height);
+
+            fieldCtx.strokeStyle = "#d6ddff";
+            fieldCtx.lineWidth = 1;
+            const gridLines = 10;
+            for (let i = 1; i < gridLines; i++) {
+                const offset = (width / gridLines) * i;
+                fieldCtx.beginPath();
+                fieldCtx.moveTo(offset, 0);
+                fieldCtx.lineTo(offset, height);
+                fieldCtx.stroke();
+                fieldCtx.beginPath();
+                fieldCtx.moveTo(0, offset);
+                fieldCtx.lineTo(width, offset);
+                fieldCtx.stroke();
+            }
+
+            const scalePerMmX = width / FIELD_SIZE_MM;
+            const scalePerMmY = height / FIELD_SIZE_MM;
+
+            fieldCtx.strokeStyle = "#b5c2df";
+            fieldCtx.lineWidth = 3;
+            fieldCtx.strokeRect(2, 2, width - 4, height - 4);
+
+            Object.entries(fieldState.cubes).forEach(([cubeId, position]) => {
+                if (!position || typeof position.x !== "number" || typeof position.y !== "number") return;
+                const metadata = subscriptions.get(cubeId);
+                const color = metadata?.color ?? "#4a6bfa";
+                const clampedX = Math.min(Math.max(position.x, FIELD_MIN), FIELD_MAX);
+                const clampedY = Math.min(Math.max(position.y, FIELD_MIN), FIELD_MAX);
+                const canvasX = ((clampedX - FIELD_MIN) / FIELD_RANGE) * width;
+                const canvasY = ((clampedY - FIELD_MIN) / FIELD_RANGE) * height;
+                const rectLength = TOIO_LENGTH_MM * scalePerMmX;
+                const rectWidth = TOIO_WIDTH_MM * scalePerMmY;
+                const rad = typeof position.angle === "number" ? (position.angle * Math.PI) / 180 : 0;
+
+                fieldCtx.save();
+                fieldCtx.translate(canvasX, canvasY);
+                fieldCtx.rotate(rad);
+                fieldCtx.fillStyle = `${color}99`;
+                fieldCtx.strokeStyle = color;
+                fieldCtx.lineWidth = 3;
+                fieldCtx.fillRect(-rectLength / 2, -rectWidth / 2, rectLength, rectWidth);
+                fieldCtx.strokeRect(-rectLength / 2, -rectWidth / 2, rectLength, rectWidth);
+                fieldCtx.beginPath();
+                fieldCtx.moveTo(0, 0);
+                fieldCtx.lineTo(rectLength / 2, 0);
+                fieldCtx.stroke();
+                fieldCtx.restore();
+
+                fieldCtx.fillStyle = "#1f2b46";
+                fieldCtx.font = "16px monospace";
+                fieldCtx.fillText(cubeId, canvasX + rectWidth, canvasY - rectWidth);
+            });
+        }
+
+        function updateFieldPosition(target, position) {
+            if (!target || !position) return;
+            fieldState.cubes[target] = position;
+            legendText.textContent = `Latest: ${target} (x:${position.x ?? "--"}, y:${position.y ?? "--"}) angle:${position.angle ?? "--"}°`;
+            drawField();
+        }
+
+        ws.onopen = () => log("Connected to relay server.");
+        ws.onclose = () => log("Connection closed.");
+        ws.onerror = (err) => log(`WebSocket error: ${err}`);
+
+        ws.onmessage = (event) => {
+            const message = JSON.parse(event.data);
+            if (message.type === "response") {
+                const payload = message.payload;
+                if (payload.info === "position") {
+                    if (payload.position && payload.target) {
+                        updateFieldPosition(payload.target, payload.position);
+                    }
+                    if (typeof payload.notify === "boolean" && !payload.notify && payload.message) {
+                        log(`Subscription ended for ${payload.target}: ${payload.message}`);
+                    }
+                }
+            } else if (message.type === "system") {
+                log(`System: ${message.payload?.message ?? ""}`);
+            }
+        };
+
+        document.getElementById("subscribe-btn").addEventListener("click", () => {
+            const target = cubeIdInput.value.trim();
+            if (!target) {
+                log("Enter a Toio ID to subscribe.");
+                return;
+            }
+            addSubscription(target);
+        });
+
+        document.getElementById("unsubscribe-btn").addEventListener("click", () => {
+            const target = cubeIdInput.value.trim();
+            if (!target) {
+                log("Enter a Toio ID to unsubscribe.");
+                return;
+            }
+            removeSubscription(target);
+        });
+
+        drawField();
+    </script>
+</body>
+</html>

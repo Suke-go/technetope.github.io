@@ -44,6 +44,7 @@ compile_commands.json
 
 # Project-specific build artifacts
 acoustics/build/
+swarm/**/build/
 
 # PlatformIO generated files
 .pio/

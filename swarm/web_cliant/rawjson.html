@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Toio WebSocket テストUI</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        textarea {
+            width: 100%;
+            height: 200px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        #log {
+            white-space: pre-wrap;
+            background: #f4f4f4;
+            border: 1px solid #ccc;
+            padding: 10px;
+            height: 300px;
+            overflow-y: scroll;
+        }
+        button {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Toio WebSocket テストUI</h1>
+
+    <label for="message">送信メッセージ:</label>
+    <textarea id="message" placeholder="ここにJSONメッセージを入力してください"></textarea>
+    <br>
+    <button onclick="sendMessage()">送信</button>
+
+    <h2>テンプレート</h2>
+    <button onclick="setTemplate('connect')">connect</button>
+    <button onclick="setTemplate('disconnect')">disconnect</button>
+    <button onclick="setTemplate('move')">move</button>
+    <button onclick="setTemplate('led')">led</button>
+    <button onclick="setTemplate('battery')">battery</button>
+    <button onclick="setTemplate('position')">position</button>
+
+    <h2>ログ</h2>
+    <div id="log"></div>
+
+    <script>
+        let socket;
+        const logDiv = document.getElementById('log');
+
+        // WebSocket接続
+        function connectWebSocket() {
+            socket = new WebSocket('ws://localhost:8765/ws');
+
+            socket.onopen = () => {
+                log('WebSocket接続が確立しました');
+            };
+
+            socket.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                log('受信:', JSON.stringify(data, null, 2));
+            };
+
+            socket.onclose = () => {
+                log('WebSocket接続が切断されました');
+            };
+
+            socket.onerror = (error) => {
+                log('エラー:', error);
+            };
+        }
+
+        // メッセージ送信
+        function sendMessage() {
+            const message = document.getElementById('message').value;
+            try {
+                const jsonMessage = JSON.parse(message);
+                socket.send(JSON.stringify(jsonMessage));
+                log('送信:', JSON.stringify(jsonMessage, null, 2));
+            } catch (e) {
+                log('エラー: 無効なJSON形式です');
+            }
+        }
+
+        // テンプレート設定
+        function setTemplate(type) {
+            const templates = {
+                connect: {
+                    type: "command",
+                    payload: {
+                        cmd: "connect",
+                        target: "685",
+                        params: {}
+                    }
+                },
+                disconnect: {
+                    type: "command",
+                    payload: {
+                        cmd: "disconnect",
+                        target: "685",
+                        params: {}
+                    }
+                },
+                move: {
+                    type: "command",
+                    payload: {
+                        cmd: "move",
+                        target: "685",
+                        params: {
+                            left_speed: 50,
+                            right_speed: 75
+                        }
+                    }
+                },
+                led: {
+                    type: "command",
+                    payload: {
+                        cmd: "led",
+                        target: "685",
+                        params: {
+                            r: 255,
+                            g: 0,
+                            b: 0
+                        }
+                    }
+                },
+                battery: {
+                    type: "query",
+                    payload: {
+                        info: "battery",
+                        target: "685"
+                    }
+                },
+                position: {
+                    type: "query",
+                    payload: {
+                        info: "position",
+                        target: "685"
+                    }
+                }
+            };
+
+            document.getElementById('message').value = JSON.stringify(templates[type], null, 2);
+        }
+
+        // ログ表示
+        function log(...messages) {
+            const logMessage = messages.join(' ');
+            logDiv.textContent += logMessage + '\n';
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        // 初期化
+        connectWebSocket();
+    </script>
+</body>
+</html>
