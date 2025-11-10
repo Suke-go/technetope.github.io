@@ -1,0 +1,66 @@
+#######################################
+# Syntax Coloring Map
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+Toio	KEYWORD1
+ToioCore	KEYWORD1
+ToioCoreMotionData	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+scan	KEYWORD2
+loop	KEYWORD2
+
+getAddress	KEYWORD2
+getName	KEYWORD2
+connect	KEYWORD2
+disconnect	KEYWORD2
+isConnected	KEYWORD2
+onConnection	KEYWORD2
+playSoundRaw	KEYWORD2
+playSoundEffect	KEYWORD2
+stopSound	KEYWORD2
+turnOnLed	KEYWORD2
+turnOffLed	KEYWORD2
+getBatteryLevel	KEYWORD2
+onBattery	KEYWORD2
+getButtonState	KEYWORD2
+onButton	KEYWORD2
+getMotion	KEYWORD2
+onMotion	KEYWORD2
+getBleProtocolVersion	KEYWORD2
+setFlatThreshold	KEYWORD2
+setClashThreshold	KEYWORD2
+setDtapThreshold	KEYWORD2
+setIDnotificationSettings	KEYWORD2
+setIDmissedNotificationSettings	KEYWORD2
+setMagneticSensorSettings	KEYWORD2
+setMotorSpeedInformationAcquistionSettings	KEYWORD2
+setPostureAngleDetectionSettings	KEYWORD2
+setSerializedInformationSettings	KEYWORD2
+onConfiguration	KEYWORD2
+setConnectionInterval	KEYWORD2
+getRequestedConnectionInterval	KEYWORD2
+getAcctualConnectionInterval	KEYWORD2
+getConfigurationResponse	KEYWORD2
+controlMotor	KEYWORD2
+drive	KEYWORD2
+controlMotorWithTarget	KEYWORD2
+controlMotorWithMultipleTargets	KEYWORD2
+controlMotorWithAcceleration
+getMotor	KEYWORD2
+onMotor	KEYWORD2
+getIDReaderData	KEYWORD2
+onIDReaderData	KEYWORD2
+_loop	KEYWORD2	KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+
