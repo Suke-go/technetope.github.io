@@ -116,3 +116,30 @@ sudo systemctl status swarm-relay
 ```bash
 sudo systemctl restart bluetooth && sudo systemctl restart swarm-relay
 ```
+
+# その他
+### bluetoothctl の使い方
+```bash
+# 対話モードで起動
+bluetoothctl
+# デバイスのスキャン開始
+scan on
+# デバイスのスキャン停止
+scan off
+# デバイス一覧表示
+devices
+# toioのペアリング（XX:XX:XX:XX:XX:XXはtoioのMACアドレス）
+pair XX:XX:XX:XX:XX:XX
+# toioの接続
+connect XX:XX:XX:XX:XX:XX
+# toioの切断
+disconnect XX:XX:XX:XX:XX:XX
+# ペアリング解除
+remove XX:XX:XX:XX:XX:XX
+# 対話モード終了
+exit
+```
+### 強度確認
+```bash
+bluetoothctl scan on
+```
