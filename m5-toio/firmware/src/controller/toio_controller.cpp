@@ -1,6 +1,6 @@
-#include "toio_controller.h"
+#include "controller/toio_controller.h"
 
-#include <algorithm>
+#include <cmath>
 
 ToioController::InitStatus ToioController::scanTargets(
     const std::string& target_fragment, uint32_t scan_duration_sec,
@@ -44,7 +44,10 @@ ToioController::InitStatus ToioController::connectAndConfigure(
   return InitStatus::kReady;
 }
 
-void ToioController::loop() { toio_.loop(); }
+void ToioController::loop() {
+  toio_.loop();
+  updateGoalTracking();
+}
 
 bool ToioController::setLedColor(uint8_t r, uint8_t g, uint8_t b) {
   if (!active_core_) {
@@ -64,6 +67,20 @@ bool ToioController::driveMotor(bool ldir, uint8_t lspeed, bool rdir,
   }
   active_core_->controlMotor(ldir, lspeed, rdir, rspeed);
   return true;
+}
+
+void ToioController::setGoal(float x, float y, float stop_distance) {
+  goal_tracker_.setGoal(x, y, stop_distance);
+}
+
+void ToioController::clearGoal() {
+  goal_tracker_.clearGoal();
+  driveMotor(true, 0, true, 0);
+}
+
+void ToioController::setGoalTuning(float vmax, float wmax, float k_r,
+                                   float k_a) {
+  goal_tracker_.setTuning(vmax, wmax, k_r, k_a);
 }
 
 std::vector<ToioCore*> ToioController::scan(uint32_t duration_sec) {
@@ -117,9 +134,6 @@ void ToioController::handleIdData(const ToioCoreIDData& data) {
     pose_.on_mat = true;
     has_pose_ = true;
   } else {
-    pose_.x = 0;
-    pose_.y = 0;
-    pose_.angle = 0;
     pose_.on_mat = false;
     has_pose_ = false;
   }
@@ -132,4 +146,19 @@ void ToioController::handleBatteryLevel(uint8_t level) {
   has_battery_ = true;
   battery_dirty_ = true;
   battery_updated_ms_ = millis();
+}
+
+void ToioController::updateGoalTracking() {
+  if (!goal_tracker_.hasGoal() || !active_core_ || !has_pose_) {
+    return;
+  }
+
+  bool left_dir = true;
+  uint8_t left_speed = 0;
+  bool right_dir = true;
+  uint8_t right_speed = 0;
+  if (goal_tracker_.computeCommand(pose_, &left_dir, &left_speed, &right_dir,
+                                   &right_speed)) {
+    driveMotor(left_dir, left_speed, right_dir, right_speed);
+  }
 }

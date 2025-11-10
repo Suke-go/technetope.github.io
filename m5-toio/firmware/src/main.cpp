@@ -1,6 +1,7 @@
 #include <M5Unified.h>
+#include <string>
 
-#include "toio_controller.h"
+#include "controller/toio_controller.h"
 
 namespace {
 constexpr uint32_t kScanDurationSec = 3;
@@ -92,23 +93,33 @@ void PerformStartupTest() {
   constexpr uint8_t kTestSpeed = 30;
 
   if (g_toio.setLedColor(kLedR, kLedG, kLedB)) {
-  M5.Log.println("LED test applied.");
+    M5.Log.println("LED test applied.");
   }
   if (g_toio.driveMotor(true, kTestSpeed, true, kTestSpeed)) {
     delay(1000);
     g_toio.driveMotor(true, 0, true, 0);
   }
 }
+
+void InitGoalFollowing() {
+  float g_goalX = 350.0f;
+  float g_goalY = 200.0f;
+  
+  g_toio.setGoalTuning(/*vmax=*/90.0f, /*wmax=*/80.0f, /*k_r=*/1.0f,
+                       /*k_a=*/0.8f);
+  g_toio.setGoal(g_goalX, g_goalY, /*stop_distance=*/20.0f);
+  M5.Log.printf("Goal set: (%0.1f, %0.1f)\n", g_goalX, g_goalY);
+}
 }  // namespace
 
 void setup() {
   InitializeM5Hardware();
-  
-  std::string target_fragment = "38t";
+
+  std::string TargetFragment = "m7d";
 
   ToioCore* target = nullptr;
   auto scan_status =
-      g_toio.scanTargets(target_fragment, kScanDurationSec, &target);
+      g_toio.scanTargets(TargetFragment, kScanDurationSec, &target);
   if (scan_status != ToioController::InitStatus::kReady) {
     ShowInitResult(scan_status);
     return;
@@ -128,9 +139,11 @@ void setup() {
   g_lastDisplay = millis();
 
   PerformStartupTest();
+  InitGoalFollowing();
 }
 
 void loop() {
+  InitGoalFollowing(); // testing
   M5.update();
   g_toio.loop();
 

@@ -6,12 +6,8 @@
 #include <string>
 #include <vector>
 
-struct CubePose {
-  uint16_t x = 0;
-  uint16_t y = 0;
-  uint16_t angle = 0;
-  bool on_mat = false;
-};
+#include "../goal_tracker/cube_pose.h"
+#include "../goal_tracker/goal_tracker.h"
 
 struct ToioLedColor {
   uint8_t r = 0;
@@ -35,6 +31,7 @@ class ToioController {
   void loop();
 
   bool hasActiveCore() const { return active_core_ != nullptr; }
+  bool hasGoal() const { return goal_tracker_.hasGoal(); }
 
   bool hasPose() const { return has_pose_; }
   const CubePose& pose() const { return pose_; }
@@ -51,6 +48,10 @@ class ToioController {
   bool setLedColor(uint8_t r, uint8_t g, uint8_t b);
   bool driveMotor(bool ldir, uint8_t lspeed, bool rdir, uint8_t rspeed);
 
+  void setGoal(float x, float y, float stop_distance = 20.0f);
+  void clearGoal();
+  void setGoalTuning(float vmax, float wmax, float k_r, float k_a);
+
  private:
   std::vector<ToioCore*> scan(uint32_t duration_sec);
   ToioCore* pickTarget(const std::vector<ToioCore*>& cores,
@@ -59,6 +60,7 @@ class ToioController {
   void configureCore(ToioCore* core);
   void handleIdData(const ToioCoreIDData& data);
   void handleBatteryLevel(uint8_t level);
+  void updateGoalTracking();
 
   Toio toio_;
   ToioCore* active_core_ = nullptr;
@@ -77,4 +79,6 @@ class ToioController {
   ToioLedColor led_color_{};
 
   uint32_t scan_duration_sec_ = 0;
+
+  GoalTracker goal_tracker_;
 };
