@@ -133,8 +133,10 @@ void ToioController::handleIdData(const ToioCoreIDData& data) {
     pose_.angle = data.position.cubeAngleDegree;
     pose_.on_mat = true;
     has_pose_ = true;
-  } else {
+  } else if (data.type == ToioCoreIDTypeNone) {
     pose_.on_mat = false;
+    has_pose_ = true;
+  } else {
     has_pose_ = false;
   }
   pose_dirty_ = true;

@@ -108,7 +108,6 @@ void InitGoalFollowing() {
   g_toio.setGoalTuning(/*vmax=*/90.0f, /*wmax=*/80.0f, /*k_r=*/1.0f,
                        /*k_a=*/0.8f);
   g_toio.setGoal(g_goalX, g_goalY, /*stop_distance=*/20.0f);
-  M5.Log.printf("Goal set: (%0.1f, %0.1f)\n", g_goalX, g_goalY);
 }
 }  // namespace
 

@@ -41,9 +41,17 @@ void GoalTracker::clearGoal() {
 bool GoalTracker::computeCommand(const CubePose& pose, bool* left_dir,
                                  uint8_t* left_speed, bool* right_dir,
                                  uint8_t* right_speed) {
-  if (!goal_.active || !pose.on_mat || !left_dir || !left_speed || !right_dir ||
+  if (!goal_.active || !left_dir || !left_speed || !right_dir ||
       !right_speed) {
     return false;
+  }
+
+  if (!pose.on_mat) {
+    *left_dir = true;
+    *right_dir = true;
+    *left_speed = 0;
+    *right_speed = 0;
+    return true;
   }
 
   const float dx = goal_.x - static_cast<float>(pose.x);
