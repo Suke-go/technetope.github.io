@@ -47,7 +47,7 @@ struct UiStatus {
    - 現在時刻（`millis()`）の表示とログ出力。
    - `has_pose` に応じて位置または「No position」を表示。
    - `has_battery` が true のときのみバッテリー残量を表示。
-   - LED RGB 値と左右モータ指令（符号で方向、数値で速度）を表示。
+   - LED RGB 値と左右モータ指令（符号付き速度値）を表示。
 3. 描画後に `last_display_ms_` を更新する。
 
 Dirty フラグのクリア自体は main 側が責任を持って行う。`UpdateStatus` 呼び出し後に `clearPoseDirty()` / `clearBatteryDirty()` を実施する。

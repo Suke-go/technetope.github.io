@@ -32,9 +32,9 @@ void PerformStartupTest() {
   if (g_toio.setLedColor(kLedR, kLedG, kLedB)) {
     M5.Log.println("LED test applied.");
   }
-  if (g_toio.driveMotor(true, kTestSpeed, true, kTestSpeed)) {
+  if (g_toio.driveMotor(kTestSpeed, kTestSpeed)) {
     delay(1000);
-    g_toio.driveMotor(true, 0, true, 0);
+    g_toio.driveMotor(0, 0);
   }
 }
 
@@ -83,7 +83,7 @@ void setup() {
 
 void loop() {
   // InitGoalFollowing(); // testing
-  // g_toio.driveMotor(false, 30, false, 30);
+  g_toio.driveMotor(-30, -30);
 
   M5.update();
   g_toio.loop();

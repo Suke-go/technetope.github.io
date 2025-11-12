@@ -17,7 +17,7 @@ GoalTracker は Toio キューブの現在姿勢 (`CubePose`) と設定された
 | `void clearGoal()` | ゴールを解除する（`computeCommand()` は以降 false を返す）。 |
 | `bool hasGoal() const` | ゴール設定の有無を返す。 |
 | `void setTuning(float vmax, float wmax, float k_r, float k_a, float reverse_threshold_deg = 90.0f, float reverse_hysteresis_deg = 10.0f)` | 追従のチューニングパラメータおよび後退判定閾値をまとめて設定する。 |
-| `bool computeCommand(const CubePose& pose, bool* leftDir, uint8_t* leftSpeed, bool* rightDir, uint8_t* rightSpeed)` | 現在姿勢から左右モータ指令を計算。指令を出した場合 true、未設定や条件未満で false。 |
+| `bool computeCommand(const CubePose& pose, int8_t* leftSpeed, int8_t* rightSpeed)` | 現在姿勢から左右モータ指令（-100〜100 の符号付き速度）を計算。指令を出した場合 true、未設定や条件未満で false。 |
 
 ### パラメータの意味と初期値
 - `vmax` (初期 70)：直進速度の最大値 (0..100)。大きいほど速く進む。
@@ -50,7 +50,7 @@ GoalTracker は Toio キューブの現在姿勢 (`CubePose`) と設定された
    ※後退中は補正後の `heading_correction` を使用
 7. 差動合成: `left = clamp(v - 0.5 * w, -100, 100)`  
    `right = clamp(v + 0.5 * w, -100, 100)`
-8. 符号で方向を決め、絶対値をスピード値 (0..100) に変換
+8. `left`/`right` をそのまま符号付き速度 (-100..100) として出力
 9. `dist < stop_distance` の場合は左右とも 0 を返し `clearGoal()` 相当の処理を行う
 
 `CubePose.on_mat == false` やゴール未設定の場合は指令を生成せず `false` を返す。

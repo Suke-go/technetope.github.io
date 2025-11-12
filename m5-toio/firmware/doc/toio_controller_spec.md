@@ -24,7 +24,7 @@ ToioController は M5StickC (UI/表示層) と Toio Core Cube の BLE 制御ロ�
 | `ToioLedColor ledColor() const` | 直近に設定された LED カラー。 |
 | `ToioMotorState motorState() const` | 直近に送信した左右モータの指令。 |
 | `bool setLedColor(uint8_t r, uint8_t g, uint8_t b)` | BLE 経由で LED を設定。成功時に内部状態も更新。 |
-| `bool driveMotor(bool ldir, uint8_t lspeed, bool rdir, uint8_t rspeed)` | Toio の左右モーターを直接制御。GoalTracker からも内部的に利用。 |
+| `bool driveMotor(int8_t leftSpeed, int8_t rightSpeed)` | Toio の左右モーターを直接制御。-100〜100 の符号付き速度を受け取り、内部で方向/絶対値に変換して送信する。GoalTracker からも内部的に利用。 |
 | `void setGoal(float x, float y, float stop_distance = 20.0f)` | 目標地点を登録し、GoalTracker が追従を開始する。 |
 | `void clearGoal()` | 目標追従を停止してモーターを停止する。 |
 | `void setGoalTuning(float vmax, float wmax, float k_r, float k_a, float reverse_threshold_deg = 90.0f, float reverse_hysteresis_deg = 10.0f)` | GoalTracker のチューニングパラメータと後退判定しきい値を変更する。 |
@@ -82,7 +82,7 @@ loop():
 ## 7. エラーハンドリング / 制約
 - 同時に扱える Toio Core は1台のみ。
 - `scanTargets` と `connectAndConfigure` は順番に呼ぶ必要がある。
-- `driveMotor` は 0〜100 の範囲を前提。範囲外は内部でクリップされる。
+- `driveMotor` は -100〜100 の範囲を前提。範囲外は内部でクリップされる。
 - GoalTracker は `pose.on_mat == true` のときのみ動作。マット外になると停止したまま保持される。
 
 ## 8. 今後の拡張ポイント

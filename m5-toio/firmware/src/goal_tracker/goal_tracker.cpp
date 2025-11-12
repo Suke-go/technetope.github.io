@@ -1,5 +1,6 @@
 #include "goal_tracker.h"
 
+#include <algorithm>
 #include <cmath>
 
 namespace {
@@ -44,17 +45,13 @@ void GoalTracker::clearGoal() {
   reverse_mode_ = false;
 }
 
-bool GoalTracker::computeCommand(const CubePose& pose, bool* left_dir,
-                                 uint8_t* left_speed, bool* right_dir,
-                                 uint8_t* right_speed) {
-  if (!goal_.active || !left_dir || !left_speed || !right_dir ||
-      !right_speed) {
+bool GoalTracker::computeCommand(const CubePose& pose, int8_t* left_speed,
+                                 int8_t* right_speed) {
+  if (!goal_.active || !left_speed || !right_speed) {
     return false;
   }
 
   if (!pose.on_mat) {
-    *left_dir = true;
-    *right_dir = true;
     *left_speed = 0;
     *right_speed = 0;
     return true;
@@ -64,8 +61,6 @@ bool GoalTracker::computeCommand(const CubePose& pose, bool* left_dir,
   const float dy = goal_.y - static_cast<float>(pose.y);
   const float dist = std::sqrt(dx * dx + dy * dy);
   if (dist < goal_.stop_distance) {
-    *left_dir = true;
-    *right_dir = true;
     *left_speed = 0;
     *right_speed = 0;
     goal_.active = false;
@@ -103,12 +98,11 @@ bool GoalTracker::computeCommand(const CubePose& pose, bool* left_dir,
   const float left = Clamp(v - 0.5f * w, -100.0f, 100.0f);
   const float right = Clamp(v + 0.5f * w, -100.0f, 100.0f);
 
-  const auto encode = [](float value, bool* dir, uint8_t* speed) {
-    *dir = value >= 0.0f;
-    *speed = static_cast<uint8_t>(Clamp(std::fabs(value), 0.0f, 100.0f));
+  const auto encode = [](float value) -> int8_t {
+    return static_cast<int8_t>(Clamp(value, -100.0f, 100.0f));
   };
 
-  encode(left, left_dir, left_speed);
-  encode(right, right_dir, right_speed);
+  *left_speed = encode(left);
+  *right_speed = encode(right);
   return true;
 }

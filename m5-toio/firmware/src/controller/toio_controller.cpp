@@ -60,16 +60,29 @@ bool ToioController::setLedColor(uint8_t r, uint8_t g, uint8_t b) {
   return true;
 }
 
-bool ToioController::driveMotor(bool ldir, uint8_t lspeed, bool rdir,
-                                uint8_t rspeed) {
+namespace {
+uint8_t ClampSpeed(int value) {
+  if (value < 0) {
+    value = -value;
+  }
+  if (value > 100) {
+    value = 100;
+  }
+  return static_cast<uint8_t>(value);
+}
+}  // namespace
+
+bool ToioController::driveMotor(int8_t left_speed, int8_t right_speed) {
   if (!active_core_) {
     return false;
   }
-  active_core_->controlMotor(ldir, lspeed, rdir, rspeed);
-  motor_state_.left_dir = ldir;
-  motor_state_.left_speed = lspeed;
-  motor_state_.right_dir = rdir;
-  motor_state_.right_speed = rspeed;
+  const bool left_dir = left_speed >= 0;
+  const bool right_dir = right_speed >= 0;
+  const uint8_t left_mag = ClampSpeed(left_speed);
+  const uint8_t right_mag = ClampSpeed(right_speed);
+  active_core_->controlMotor(left_dir, left_mag, right_dir, right_mag);
+  motor_state_.left_speed = left_speed; // clamp していない生の値を保存
+  motor_state_.right_speed = right_speed; // clamp していない生の値を保存
   return true;
 }
 
@@ -79,7 +92,7 @@ void ToioController::setGoal(float x, float y, float stop_distance) {
 
 void ToioController::clearGoal() {
   goal_tracker_.clearGoal();
-  driveMotor(true, 0, true, 0);
+  driveMotor(0, 0);
 }
 
 void ToioController::setGoalTuning(float vmax, float wmax, float k_r,
@@ -161,12 +174,9 @@ void ToioController::updateGoalTracking() {
     return;
   }
 
-  bool left_dir = true;
-  uint8_t left_speed = 0;
-  bool right_dir = true;
-  uint8_t right_speed = 0;
-  if (goal_tracker_.computeCommand(pose_, &left_dir, &left_speed, &right_dir,
-                                   &right_speed)) {
-    driveMotor(left_dir, left_speed, right_dir, right_speed);
+  int8_t left_speed = 0;
+  int8_t right_speed = 0;
+  if (goal_tracker_.computeCommand(pose_, &left_speed, &right_speed)) {
+    driveMotor(left_speed, right_speed);
   }
 }

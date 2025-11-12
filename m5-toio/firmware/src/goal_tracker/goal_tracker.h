@@ -16,8 +16,8 @@ class GoalTracker {
   bool hasGoal() const { return goal_.active; }
 
   // 戻り値: 指令が生成されたら true
-  bool computeCommand(const CubePose& pose, bool* left_dir, uint8_t* left_speed,
-                      bool* right_dir, uint8_t* right_speed);
+  bool computeCommand(const CubePose& pose, int8_t* left_speed,
+                      int8_t* right_speed);
 
  private:
   struct GoalState {

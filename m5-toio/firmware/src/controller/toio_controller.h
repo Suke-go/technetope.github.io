@@ -16,10 +16,8 @@ struct ToioLedColor {
 };
 
 struct ToioMotorState {
-  bool left_dir = true;
-  uint8_t left_speed = 0;
-  bool right_dir = true;
-  uint8_t right_speed = 0;
+  int8_t left_speed = 0;
+  int8_t right_speed = 0;
 };
 
 class ToioController {
@@ -54,7 +52,7 @@ class ToioController {
   ToioMotorState motorState() const { return motor_state_; }
 
   bool setLedColor(uint8_t r, uint8_t g, uint8_t b);
-  bool driveMotor(bool ldir, uint8_t lspeed, bool rdir, uint8_t rspeed);
+  bool driveMotor(int8_t left_speed, int8_t right_speed);
 
   void setGoal(float x, float y, float stop_distance = 20.0f);
   void clearGoal();

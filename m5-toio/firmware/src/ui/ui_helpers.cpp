@@ -105,12 +105,10 @@ void UiHelpers::ShowStatus(uint32_t now_ms) {
   }
   display.printf("LED RGB:(%3u,%3u,%3u)\n", status_.led.r, status_.led.g,
                  status_.led.b);
-  display.printf("Motor L:%c%3u R:%c%3u\n",
-                 status_.motor.left_dir ? '+' : '-', status_.motor.left_speed,
-                 status_.motor.right_dir ? '+' : '-', status_.motor.right_speed);
-  M5.Log.printf(" LED RGB:(%u,%u,%u) Motor L:%c%u R:%c%u", status_.led.r,
-                status_.led.g, status_.led.b,
-                status_.motor.left_dir ? '+' : '-', status_.motor.left_speed,
-                status_.motor.right_dir ? '+' : '-', status_.motor.right_speed);
+  display.printf("Motor L:%4d R:%4d\n", status_.motor.left_speed,
+                 status_.motor.right_speed);
+  M5.Log.printf(" LED RGB:(%u,%u,%u) Motor L:%d R:%d", status_.led.r,
+                status_.led.g, status_.led.b, status_.motor.left_speed,
+                status_.motor.right_speed);
   M5.Log.println();
 }
